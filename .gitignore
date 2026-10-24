@@ -1,0 +1,26 @@
+# Environnements virtuels Python
+.venv/
+venv/
+env/
+
+# Artefacts Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Empaquetage PyInstaller
+build/
+dist/
+*.spec
+
+# Configuration locale de l'application
+config.json
+
+# Outils et fichiers système
+.freebuff/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
