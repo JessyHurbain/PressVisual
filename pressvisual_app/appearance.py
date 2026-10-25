@@ -105,8 +105,18 @@ class ColorButton(QPushButton):
             self.set_color(chosen)
 
 
+#: Cadence des étapes de la démonstration animée de l'aperçu (ms).
+DEMO_STEP_MS = 700
+
+
 class PreviewPanel(QWidget):
-    """Aperçu compact de l'overlay avec les réglages en cours."""
+    """Aperçu compact de l'overlay avec les réglages en cours.
+
+    Une petite démonstration anime l'aperçu : une lettre s'allume sur le
+    clavier, un bouton de souris s'enfonce, puis une combinaison et un clic
+    droit prennent le relais. Le mode standard montre la même chose sous
+    forme de pastilles.
+    """
 
     def __init__(
         self,
@@ -132,6 +142,12 @@ class PreviewPanel(QWidget):
         font.setPointSize(max(9, config.font_size - 1))
         font.setWeight(QFont.Weight.DemiBold)
 
+        # Démonstration animée : une pastille dont le contenu change pour
+        # montrer une frappe puis un clic dans le mode standard. Elle est
+        # placée en tête pour rester visible sans faire défiler l'aperçu.
+        self._demo_row = KeyRow(font, self._palette, self)
+        self._layout.addWidget(self._demo_row)
+
         self._rows: list[KeyRow] = []
         samples: tuple[tuple[tuple[str, str], ...], ...] = (
             ((_t("Ctrl"), "mod"), ("+", "plus"), ("C", "key")),
@@ -151,8 +167,63 @@ class PreviewPanel(QWidget):
         self._keyboard = self._visual.keyboard
         self._mouse = self._visual.mouse
         self._layout.addWidget(self._visual, 0, Qt.AlignmentFlag.AlignLeft)
+
+        self._demo_step = 0
+        self._demo_timer = QTimer(self)
+        self._demo_timer.setInterval(DEMO_STEP_MS)
+        self._demo_timer.timeout.connect(self._advance_demo)
+
         self._apply_mode(config)
+        self._apply_demo_step()
+        self._demo_timer.start()
         self._sync_minimum_size()
+
+    # ------------------------------------------------------------------
+    # Démonstration animée
+    # ------------------------------------------------------------------
+    def _demo_steps(
+        self,
+    ) -> tuple[
+        tuple[
+            tuple[str, ...],
+            tuple[str, ...],
+            tuple[str, ...],
+            Optional[tuple[str, int]],
+            tuple[tuple[str, str], ...],
+        ],
+        ...,
+    ]:
+        """Étapes de la démonstration : touches, modificateurs, boutons,
+        molette et pastille équivalente dans le mode standard."""
+        letter = (("a", "key"),)
+        click = ((_t("Clic droit"), "mouse"),)
+        return (
+            (("a",), (), ("left",), None, letter),
+            ((), (), (), None, letter),
+            (("e",), ("shift",), ("right",), ("vertical", 1), click),
+            ((), (), (), None, click),
+        )
+
+    def _advance_demo(self) -> None:
+        """Passe à l'étape suivante de la démonstration."""
+        steps = self._demo_steps()
+        self._demo_step = (self._demo_step + 1) % len(steps)
+        self._apply_demo_step()
+
+    def _apply_demo_step(self) -> None:
+        """Applique l'étape courante au clavier, à la souris et à la pastille."""
+        steps = self._demo_steps()
+        keys, modifiers, buttons, scroll, items = steps[
+            self._demo_step % len(steps)
+        ]
+        self._keyboard.set_modifiers(modifiers)
+        self._keyboard.set_active(keys)
+        self._mouse.set_buttons(buttons)
+        if scroll is None:
+            self._mouse.clear_scroll()
+        else:
+            self._mouse.set_scroll(*scroll)
+        self._demo_row.set_items(items)
 
     # ------------------------------------------------------------------
     def _apply_mode(self, config: Config) -> None:
@@ -161,6 +232,7 @@ class PreviewPanel(QWidget):
         self._visual.set_mode_visible(keyboard_mode)
         for row in self._rows:
             row.setVisible(not keyboard_mode)
+        self._demo_row.setVisible(not keyboard_mode)
 
     # ------------------------------------------------------------------
     def _sync_minimum_size(self) -> None:
@@ -180,6 +252,7 @@ class PreviewPanel(QWidget):
         font.setWeight(QFont.Weight.DemiBold)
         for row in self._rows:
             row.set_font(font)
+        self._demo_row.set_font(font)
 
         keyboard_font = QFont(font_family)
         keyboard_font.setPointSize(max(9, config.font_size - 4))

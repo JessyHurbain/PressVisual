@@ -8,6 +8,7 @@ from PyQt6.QtGui import QColor, QFontDatabase
 from PyQt6.QtWidgets import QApplication, QDialog
 
 import pressvisual
+from pressvisual_app import appearance as appearance_module
 from pressvisual_app import overlay as overlay_module
 
 
@@ -229,6 +230,70 @@ def test_preview_keyboard_follows_the_chosen_layout(qapp, config):
         dialog.layout_combo.setCurrentIndex(dialog.layout_combo.findData("qwerty"))
 
         assert dialog.preview._keyboard.layout.name == "qwerty"
+    finally:
+        dialog.deleteLater()
+
+
+def test_preview_animates_a_keystroke_and_a_click(qapp, config):
+    dialog = make_dialog(qapp, config)
+    try:
+        preview = dialog.preview
+        assert preview._demo_timer.isActive()
+        assert preview._demo_timer.interval() == appearance_module.DEMO_STEP_MS
+
+        preview._demo_step = 0
+        preview._apply_demo_step()
+
+        assert preview._keyboard.active_labels() == ["A"]
+        assert preview._mouse.active_buttons() == ["left"]
+        assert preview._demo_row._items == [("a", "key")]
+
+        preview._advance_demo()
+
+        assert preview._keyboard.active_labels() == []
+        assert preview._mouse.active_buttons() == []
+        assert preview._demo_row._items == [("a", "key")]
+
+        preview._advance_demo()
+
+        labels = preview._keyboard.active_labels()
+        assert "E" in labels
+        assert labels.count("Maj") == 2
+        assert preview._mouse.active_buttons() == ["right"]
+        assert preview._mouse.scroll == ("vertical", 1)
+        assert preview._demo_row._items == [("Clic droit", "mouse")]
+    finally:
+        dialog.deleteLater()
+
+
+def test_preview_animation_loops_back(qapp, config):
+    dialog = make_dialog(qapp, config)
+    try:
+        preview = dialog.preview
+        preview._demo_step = 0
+        preview._apply_demo_step()
+
+        for _ in range(len(preview._demo_steps())):
+            preview._advance_demo()
+
+        assert preview._demo_step == 0
+        assert preview._keyboard.active_labels() == ["A"]
+    finally:
+        dialog.deleteLater()
+
+
+def test_preview_demo_row_follows_the_mode(qapp, config):
+    dialog = make_dialog(qapp, config)
+    try:
+        assert dialog.preview._demo_row.isHidden() is False
+
+        dialog.mode_combo.setCurrentIndex(dialog.mode_combo.findData("keyboard"))
+
+        assert dialog.preview._demo_row.isHidden() is True
+
+        dialog.mode_combo.setCurrentIndex(dialog.mode_combo.findData("overlay"))
+
+        assert dialog.preview._demo_row.isHidden() is False
     finally:
         dialog.deleteLater()
 

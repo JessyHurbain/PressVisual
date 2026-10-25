@@ -261,6 +261,9 @@ fenêtre de réglages avec un aperçu en direct :
   L'aperçu bascule immédiatement sur le clavier, avec ou sans sa souris.
 - **Interface** : langue de l'interface (automatique, français ou anglais).
   Le changement s'applique dès l'enregistrement, sans redémarrer.
+- **Aperçu animé** : la démonstration rejoue en boucle une frappe et un clic
+  (touche `A`, puis `Maj + E` avec un clic droit et un cran de molette), dans
+  le mode choisi, pour juger du rendu sans rien taper soi-même.
 - **Réinitialiser** restaure les valeurs d'origine, **Annuler** ferme sans rien
   changer et **Enregistrer** applique les réglages immédiatement puis les écrit
   dans le fichier de configuration.
