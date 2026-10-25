@@ -334,7 +334,7 @@ def test_keyboard_mode_shows_held_modifiers(qapp, config):
         qapp.processEvents()
 
 
-def test_keyboard_mode_ignores_mouse_events(qapp, config):
+def test_keyboard_mode_shows_clicks_on_the_mouse(qapp, config):
     overlay = make_keyboard_overlay(qapp, config)
     try:
         overlay._on_mouse(MouseEvent(kind="click", button="left"))
@@ -342,6 +342,8 @@ def test_keyboard_mode_ignores_mouse_events(qapp, config):
 
         assert overlay._rows == []
         assert overlay._keyboard.active_labels() == []
+        assert overlay._mouse.active_buttons() == ["left"]
+        assert overlay._mouse.scroll == ("vertical", 1)
     finally:
         overlay._hide_now()
         overlay.deleteLater()

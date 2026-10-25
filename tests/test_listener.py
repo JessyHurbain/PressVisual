@@ -20,9 +20,11 @@ class Recorder:
         self.hotkeys: list[str] = []
         self.errors: list[str] = []
         self.releases: list[str] = []
+        self.mouse_releases: list[str] = []
         self.bridge.key_event.connect(self.keys.append)
         self.bridge.key_release.connect(self.releases.append)
         self.bridge.mouse_event.connect(self.mouse.append)
+        self.bridge.mouse_release.connect(self.mouse_releases.append)
         self.bridge.modifiers_changed.connect(self.modifiers.append)
         self.bridge.hotkey.connect(self.hotkeys.append)
         self.bridge.error.connect(self.errors.append)
@@ -206,12 +208,22 @@ def test_unidentified_release_is_ignored(recorder, config):
     assert recorder.releases == []
 
 
-def test_click_release_is_ignored(recorder, config):
+def test_click_release_emits_the_button_without_a_click(recorder, config):
     listener = make_listener(recorder, config)
 
     listener._on_click(10, 10, mouse.Button.left, False)
 
     assert recorder.mouse == []
+    assert recorder.mouse_releases == ["left"]
+
+
+def test_click_press_does_not_emit_a_release(recorder, config):
+    listener = make_listener(recorder, config)
+
+    listener._on_click(10, 10, mouse.Button.right, True)
+
+    assert len(recorder.mouse) == 1
+    assert recorder.mouse_releases == []
 
 
 def test_unknown_button_is_ignored(recorder, config):

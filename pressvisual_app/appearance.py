@@ -43,7 +43,7 @@ from .config import APPEARANCE_COLOR_FIELDS, Config, _color_to_text
 from .constants import APP_NAME
 from .i18n import LANGUAGE_AUTO, _t
 from .icon import build_app_icon
-from .keyboard import KeyboardView
+from .keyboard import InputView
 from .theme import Palette, _config_color
 from .widgets import KeyRow
 
@@ -146,8 +146,10 @@ class PreviewPanel(QWidget):
 
         keyboard_font = QFont(font)
         keyboard_font.setPointSize(max(9, config.font_size - 4))
-        self._keyboard = KeyboardView(config, keyboard_font, self._palette, self)
-        self._layout.addWidget(self._keyboard)
+        self._visual = InputView(config, keyboard_font, self._palette, self)
+        self._keyboard = self._visual.keyboard
+        self._mouse = self._visual.mouse
+        self._layout.addWidget(self._visual, 0, Qt.AlignmentFlag.AlignLeft)
         self._apply_mode(config)
         self._sync_minimum_size()
 
@@ -155,7 +157,7 @@ class PreviewPanel(QWidget):
     def _apply_mode(self, config: Config) -> None:
         """N'affiche que la vue correspondant au mode choisi."""
         keyboard_mode = config.display_mode == "keyboard"
-        self._keyboard.setVisible(keyboard_mode)
+        self._visual.set_mode_visible(keyboard_mode)
         for row in self._rows:
             row.setVisible(not keyboard_mode)
 
@@ -180,8 +182,8 @@ class PreviewPanel(QWidget):
 
         keyboard_font = QFont(font_family)
         keyboard_font.setPointSize(max(9, config.font_size - 4))
-        self._keyboard.set_config(config)
-        self._keyboard.set_font(keyboard_font)
+        self._visual.set_config(config)
+        self._visual.set_font(keyboard_font)
         self._apply_mode(config)
         self._sync_minimum_size()
         # Le QScrollArea réévalue la taille du widget après le layout : on

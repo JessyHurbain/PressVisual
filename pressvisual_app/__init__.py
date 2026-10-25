@@ -63,6 +63,7 @@ from .keyboard import (
     AZERTY,
     LAYOUTS,
     QWERTY,
+    InputView,
     KeyboardLayout,
     KeyboardView,
     Key,
@@ -84,6 +85,7 @@ from .keymap import (
     parse_hotkey,
     should_use_combo,
 )
+from .mouse import MOUSE_BUTTONS, MOUSE_SCROLL_FLASH_MS, MouseView
 from .overlay import (
     KEYBOARD_MAX_LIT,
     MAX_TEXT_LENGTH,
@@ -107,6 +109,7 @@ __all__ = [
     "DOUBLE_CLICK_WINDOW",
     "InputBridge",
     "InputListener",
+    "InputView",
     "KEYBOARD_MAX_LIT",
     "KEYBOARD_LAYOUTS",
     "LAYOUTS",
@@ -121,8 +124,11 @@ __all__ = [
     "MODIFIER_KEYS",
     "MODIFIER_ORDER",
     "MOUSE_BUTTON_NAMES",
+    "MOUSE_BUTTONS",
+    "MOUSE_SCROLL_FLASH_MS",
     "MULTI_CLICK_LABELS",
     "MouseEvent",
+    "MouseView",
     "NUMPAD_VK_CHARS",
     "Overlay",
     "POSITION_CHOICES",

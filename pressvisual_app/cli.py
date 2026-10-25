@@ -300,6 +300,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     bridge.key_event.connect(overlay._on_key)
     bridge.key_release.connect(overlay._on_key_release)
     bridge.mouse_event.connect(overlay._on_mouse)
+    bridge.mouse_release.connect(overlay._on_mouse_release)
     bridge.modifiers_changed.connect(overlay._on_modifiers)
     bridge.hotkey.connect(dispatch_hotkey)
 

@@ -22,8 +22,9 @@ plan, et n'apparaît que lorsqu'il y a quelque chose à montrer.
 - **Overlay moderne** : coins arrondis, fond sombre dégradé semi-transparent
   (type verre fumé), texte blanc contrasté, police système épurée.
 - **Deux modes d'affichage** : les pastilles de frappes habituelles, ou un
-  **clavier complet** AZERTY ou QWERTY dont les touches s'allument au fil de la
-  saisie. Le mode se choisit dans la fenêtre de personnalisation.
+  **clavier complet** AZERTY ou QWERTY accompagné d'une **souris** dont les
+  touches et les boutons s'allument au fil de la saisie. Le mode se choisit
+  dans la fenêtre de personnalisation.
 - **Apparence personnalisable** : une fenêtre de réglages avec aperçu en direct
   permet de changer les couleurs, la police, l'opacité, les coins arrondis et
   les marges, puis d'enregistrer le tout dans la configuration.
@@ -216,21 +217,27 @@ La position initiale se règle aussi avec `--position` ou la clé `position` de
 ### Mode clavier complet
 
 Avec `"display_mode": "keyboard"`, la bulle affiche un **clavier compact** à
-la place des pastilles : chaque touche s'allume **tant qu'elle est enfoncée**
-et s'éteint dès le relâchement ; les modificateurs (Ctrl, Alt, Maj, Win)
-restent allumés tant qu'ils sont maintenus. Il n'y a ni ligne de texte ni badge
-de clic : seules les touches réagissent, ce qui met le geste en avant pour une
-démonstration ou un tutoriel.
+la place des pastilles, flanqué à sa droite d'une **souris** : chaque touche
+s'allume **tant qu'elle est enfoncée** et s'éteint dès le relâchement ; les
+modificateurs (Ctrl, Alt, Maj, Win) restent allumés tant qu'ils sont maintenus.
+Il n'y a ni ligne de texte ni badge de clic : seuls le clavier et la souris
+réagissent, ce qui met le geste en avant pour une démonstration ou un tutoriel.
 
 - Deux dispositions : **AZERTY** (par défaut) et **QWERTY**, réglables dans la
   fenêtre de personnalisation ou avec `keyboard_layout`.
 - Clavier compact : lettres, chiffres et ponctuation courante, Tab, Verr Maj,
   Maj, Ctrl, Alt, Win, Espace, Entrée, Retour, Échap et flèches.
-- La taille du clavier suit la police et sa « Taille » : augmentez `font_size`
-  pour un clavier plus grand à l'écran.
+- Souris schématique : **bouton gauche**, **bouton droit**, **molette** et les
+  deux **boutons latéraux** (Précédent, Suivant). Un bouton s'allume tant qu'il
+  est enfoncé ; un cran de molette allume la molette et un triangle indique le
+  sens du défilement (haut, bas, gauche, droite) pendant un court instant,
+  puisqu'un cran n'a pas de relâchement. Avec `"capture_mouse": false`, la
+  souris n'est pas dessinée.
+- La taille du clavier et de la souris suit la police et sa « Taille » :
+  augmentez `font_size` pour une vue plus grande à l'écran.
 - Le **mode masqué** (`Ctrl + F10`) n'allume aucune touche de caractère : les
-  frappes sensibles ne sont pas révélées, contrairement aux modificateurs.
-- La souris, les clics et la molette ne sont pas affichés dans ce mode.
+  frappes sensibles ne sont pas révélées, contrairement aux modificateurs et
+  aux clics de souris.
 
 Le mode se change à chaud : enregistrer dans la fenêtre de personnalisation
 applique immédiatement le clavier ou les pastilles, sans redémarrer.
@@ -247,8 +254,8 @@ fenêtre de réglages avec un aperçu en direct :
 - **Mise en forme** : police, taille, opacité du fond, rayon des coins, marge
   avec le bord de l'écran et largeur maximale.
 - **Affichage** : mode (overlay standard ou clavier complet) et disposition du
-  clavier (AZERTY ou QWERTY). L'aperçu bascule immédiatement sur le clavier
-  lorsqu'on choisit ce mode.
+  clavier (AZERTY ou QWERTY). L'aperçu bascule immédiatement sur le clavier et
+  sa souris lorsqu'on choisit ce mode.
 - **Interface** : langue de l'interface (automatique, français ou anglais).
   Le changement s'applique dès l'enregistrement, sans redémarrer.
 - **Réinitialiser** restaure les valeurs d'origine, **Annuler** ferme sans rien
@@ -614,7 +621,8 @@ pressvisual_app/      Code de l'application
   capture.py          Écoute globale du clavier et de la souris (pynput)
   events.py           Événements et pont de signaux Qt
   theme.py            Palette et utilitaires de couleur
-  keyboard.py         Dispositions AZERTY/QWERTY et vue du clavier compact
+  keyboard.py         Dispositions AZERTY/QWERTY, vue du clavier et vue combinée
+  mouse.py            Souris schématique (boutons et molette)
   widgets.py          Pastilles et lignes de badges
   overlay.py          Fenêtre flottante
   appearance.py       Fenêtre de personnalisation et aperçu

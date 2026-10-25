@@ -254,11 +254,13 @@ class InputListener(threading.Thread):
     # Souris
     # ------------------------------------------------------------------
     def _on_click(self, x, y, button, pressed) -> None:
-        if not pressed:
-            return
         try:
             name = MOUSE_BUTTON_NAMES.get(button)
             if name is None:
+                return
+            if not pressed:
+                # L'interface éteint le bouton dès qu'il est relâché.
+                self._bridge.mouse_release.emit(name)
                 return
 
             now = time.monotonic()

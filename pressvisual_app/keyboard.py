@@ -15,10 +15,11 @@ from typing import Iterable, Iterator, Optional
 
 from PyQt6.QtCore import QRectF, QSize, Qt
 from PyQt6.QtGui import QFont, QFontMetrics, QPainter, QPen
-from PyQt6.QtWidgets import QSizePolicy, QWidget
+from PyQt6.QtWidgets import QHBoxLayout, QSizePolicy, QWidget
 
 from .config import Config
 from .i18n import _t
+from .mouse import MouseView
 from .theme import Palette, _with_alpha
 
 
@@ -437,3 +438,66 @@ class KeyboardView(QWidget):
                 self._paint_key(painter, key, rect)
                 x += advance
             y += height + self.ROW_GAP
+
+
+class InputView(QWidget):
+    """Clavier complet et souris, côte à côte."""
+
+    GAP = 12
+
+    def __init__(
+        self,
+        config: Config,
+        font: QFont,
+        palette: Palette,
+        parent: Optional[QWidget] = None,
+    ) -> None:
+        super().__init__(parent)
+        self._cfg = config
+        self._visible = True
+
+        self._layout = QHBoxLayout(self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.setSpacing(self.GAP)
+        self._layout.setAlignment(Qt.AlignmentFlag.AlignBottom)
+
+        self.keyboard = KeyboardView(config, font, palette, self)
+        self.mouse = MouseView(palette, self)
+        self._layout.addWidget(self.keyboard, 0, Qt.AlignmentFlag.AlignBottom)
+        self._layout.addWidget(self.mouse, 0, Qt.AlignmentFlag.AlignBottom)
+
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self._sync_mouse()
+        self._apply_visibility()
+
+    # ------------------------------------------------------------------
+    def set_font(self, font: QFont) -> None:
+        self.keyboard.set_font(font)
+        self._sync_mouse()
+
+    def set_config(self, config: Config) -> None:
+        """Relit la configuration (aperçu de la fenêtre d'apparence)."""
+        self._cfg = config
+        self.keyboard.set_config(config)
+        self._sync_mouse()
+        self._apply_visibility()
+
+    def refresh_layout(self) -> None:
+        self.keyboard.refresh_layout()
+        self._sync_mouse()
+
+    def set_mode_visible(self, visible: bool) -> None:
+        """Affiche la vue complète, ou la masque en mode pastilles."""
+        self._visible = bool(visible)
+        self._apply_visibility()
+
+    def _sync_mouse(self) -> None:
+        """La souris prend la hauteur du clavier pour rester alignée."""
+        self.mouse.set_height(self.keyboard.sizeHint().height())
+        self.updateGeometry()
+
+    def _apply_visibility(self) -> None:
+        # La souris n'a de sens que si ses clics sont capturés.
+        self.keyboard.setVisible(self._visible)
+        self.mouse.setVisible(self._visible and bool(self._cfg.capture_mouse))
+        self.setVisible(self._visible)

@@ -34,7 +34,7 @@ from .config import APPEARANCE_CONFIG_KEYS, Config
 from .constants import APP_NAME
 from .events import KeyEvent, MouseEvent
 from .i18n import _t
-from .keyboard import KeyboardView
+from .keyboard import InputView
 from .keymap import (
     MODIFIER_ORDER,
     MULTI_CLICK_LABELS,
@@ -44,6 +44,7 @@ from .keymap import (
     modifier_label,
     should_use_combo,
 )
+from .mouse import MOUSE_BUTTONS, MOUSE_SCROLL_FLASH_MS
 from .theme import Palette
 from .widgets import KeyRow
 
@@ -103,6 +104,8 @@ class Overlay(QWidget):
         self._mode = "keyboard" if config.display_mode == "keyboard" else "overlay"
         self._kb_active: set[str] = set()
         self._kb_modifiers: set[str] = set()
+        self._mouse_buttons: set[str] = set()
+        self._mouse_scroll: Optional[tuple[str, int]] = None
         self._dragging = False
         self._drag_origin = QPoint(0, 0)
         self._fade_target = "idle"
@@ -126,15 +129,21 @@ class Overlay(QWidget):
         self._typing_timer.setSingleShot(True)
         self._typing_timer.timeout.connect(self._finish_text)
 
-        # Vue « clavier complet » : seule la disposition choisie est dessinée.
-        self._keyboard = KeyboardView(
+        # Un cran de molette n'a pas de relâchement : le sens affiché
+        # s'éteint seul après un court délai.
+        self._mouse_scroll_timer = QTimer(self)
+        self._mouse_scroll_timer.setSingleShot(True)
+        self._mouse_scroll_timer.timeout.connect(self._end_mouse_scroll)
+
+        # Vue « clavier complet » : la disposition choisie, puis la souris.
+        self._visual = InputView(
             self._cfg, self._badge_font, self._palette, self
         )
+        self._keyboard = self._visual.keyboard
+        self._mouse = self._visual.mouse
         if self._mode == "keyboard":
-            self._layout.addWidget(self._keyboard)
-            self._keyboard.show()
-        else:
-            self._keyboard.hide()
+            self._layout.addWidget(self._visual)
+        self._visual.set_mode_visible(self._mode == "keyboard")
 
         self._anchoring_ready = False
         self.resize(320, 64)
@@ -186,9 +195,9 @@ class Overlay(QWidget):
         self._text_font.setWeight(QFont.Weight.Medium)
         self._text_metrics = QFontMetrics(self._text_font)
 
-        keyboard = getattr(self, "_keyboard", None)
-        if keyboard is not None:
-            keyboard.set_font(self._badge_font)
+        visual = getattr(self, "_visual", None)
+        if visual is not None:
+            visual.set_font(self._badge_font)
 
     def apply_appearance(self, values: dict[str, object]) -> None:
         """Applique de nouveaux réglages d'apparence à l'overlay."""
@@ -221,8 +230,9 @@ class Overlay(QWidget):
     def _apply_display_mode(self) -> None:
         """Bascule entre les pastilles et le clavier complet."""
         mode = "keyboard" if self._cfg.display_mode == "keyboard" else "overlay"
-        self._keyboard.refresh_layout()
-        self._keyboard.set_font(self._badge_font)
+        self._visual.set_config(self._cfg)
+        self._visual.set_font(self._badge_font)
+        self._visual.set_mode_visible(mode == "keyboard")
         self._keyboard.set_masked(self._masked)
 
         if mode == self._mode:
@@ -233,11 +243,9 @@ class Overlay(QWidget):
         self._clear_rows()
         self._clear_keyboard()
         if mode == "keyboard":
-            self._layout.addWidget(self._keyboard)
-            self._keyboard.show()
+            self._layout.addWidget(self._visual)
         else:
-            self._layout.removeWidget(self._keyboard)
-            self._keyboard.hide()
+            self._layout.removeWidget(self._visual)
         self._relayout()
 
     def _press_key(self, event: KeyEvent) -> None:
@@ -259,14 +267,26 @@ class Overlay(QWidget):
             self._apply_keyboard_state()
 
     def _clear_keyboard(self) -> None:
-        """Éteint toutes les touches du clavier."""
+        """Éteint toutes les touches du clavier et les boutons de la souris."""
         self._kb_active.clear()
+        self._clear_mouse()
         self._apply_keyboard_state()
+
+    def _clear_mouse(self) -> None:
+        """Éteint les boutons de la souris et le sens du défilement."""
+        self._mouse_buttons.clear()
+        self._mouse_scroll = None
+        self._mouse_scroll_timer.stop()
 
     def _apply_keyboard_state(self) -> None:
         self._keyboard.set_masked(self._masked)
         self._keyboard.set_modifiers(self._kb_modifiers)
         self._keyboard.set_active(self._kb_active)
+        self._mouse.set_buttons(self._mouse_buttons)
+        if self._mouse_scroll is None:
+            self._mouse.clear_scroll()
+        else:
+            self._mouse.set_scroll(*self._mouse_scroll)
 
     # ------------------------------------------------------------------
     # Peinture et déplacement
@@ -857,19 +877,52 @@ class Overlay(QWidget):
         if not self._capture_enabled or not self._cfg.capture_mouse:
             return
 
-        # Le mode clavier n'affiche que les touches : la souris est ignorée.
-        if self._mode == "keyboard":
-            return
-
         if self._cfg.ignore_overlay_clicks and not self._click_through and self.isVisible():
             if self.geometry().contains(QPoint(event.x, event.y)):
                 return
+
+        # Le mode clavier n'affiche ni texte ni pastilles : la souris allume
+        # ses boutons sur le schéma au lieu de créer une ligne.
+        if self._mode == "keyboard":
+            self._on_mouse_visual(event)
+            return
 
         if event.kind == "scroll":
             self._on_scroll(event)
             return
         if event.kind == "click" and event.button:
             self._on_click(event)
+
+    # ------------------------------------------------------------------
+    # Souris du mode clavier
+    # ------------------------------------------------------------------
+    def _on_mouse_visual(self, event: MouseEvent) -> None:
+        """Allume le bouton enfoncé ou le sens du défilement."""
+        if event.kind == "click" and event.button:
+            self._mouse_buttons.add(event.button)
+            self._apply_keyboard_state()
+            self._bump()
+        elif event.kind == "scroll":
+            axis = event.axis or "vertical"
+            self._mouse_scroll = (axis, 1 if event.direction >= 0 else -1)
+            self._apply_keyboard_state()
+            self._mouse_scroll_timer.start(MOUSE_SCROLL_FLASH_MS)
+            self._bump()
+
+    def _on_mouse_release(self, button: str) -> None:
+        """Éteint le bouton dès qu'il est relâché."""
+        if self._mode != "keyboard":
+            return
+        if button in self._mouse_buttons:
+            self._mouse_buttons.discard(button)
+            self._apply_keyboard_state()
+
+    def _end_mouse_scroll(self) -> None:
+        """Éteint l'indicateur de défilement après son court délai."""
+        if self._mouse_scroll is None:
+            return
+        self._mouse_scroll = None
+        self._apply_keyboard_state()
 
     def _on_scroll(self, event: MouseEvent) -> None:
         now = time.monotonic()
