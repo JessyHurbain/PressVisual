@@ -38,6 +38,9 @@ plan, et n'apparaît que lorsqu'il y a quelque chose à montrer.
   de caractère pour ces touches.
 - **Souris** : clic gauche, clic droit, clic milieu, double-clic, triple-clic et
   molette (les crans successifs sont agrégés : `Scroll ↓ ×3`).
+- **Combinaisons souris** : les modificateurs maintenus accompagnent la molette
+  et les clics, comme au clavier : `[Ctrl] + [Scroll ↑]` (zoom),
+  `[Maj] + [Clic droit]`, `[Ctrl] + [Clic milieu]`, etc.
 - **Raccourcis globaux** pour masquer l'overlay, le rendre transparent aux clics,
   masquer les frappes sensibles ou quitter.
 - **Mode privé** : `Ctrl + F12` masque tout et suspend la capture ; les frappes

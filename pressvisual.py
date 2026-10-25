@@ -631,6 +631,7 @@ class MouseEvent:
     direction: int = 0              # +1 haut, -1 bas (molette)
     x: int = 0
     y: int = 0
+    mods: tuple[str, ...] = ()      # Ctrl / Alt / Maj / Win maintenus
 
 
 # ---------------------------------------------------------------------------
@@ -844,7 +845,14 @@ class InputListener(threading.Thread):
             self._last_click = (now, int(x), int(y), count)
 
             self._bridge.mouse_event.emit(
-                MouseEvent(kind="click", button=name, count=count, x=int(x), y=int(y))
+                MouseEvent(
+                    kind="click",
+                    button=name,
+                    count=count,
+                    x=int(x),
+                    y=int(y),
+                    mods=self._mods_snapshot(),
+                )
             )
         except Exception as exc:
             self._report_error(f"Erreur pendant la lecture de la souris : {exc}")
@@ -863,6 +871,7 @@ class InputListener(threading.Thread):
                     direction=direction,
                     x=int(x),
                     y=int(y),
+                    mods=self._mods_snapshot(),
                 )
             )
         except Exception as exc:
@@ -1254,6 +1263,7 @@ class Overlay(QWidget):
         self._scroll_direction = 0
         self._scroll_count = 0
         self._scroll_time = 0.0
+        self._scroll_mods: tuple[str, ...] = ()
         self._last_left_row: Optional[KeyRow] = None
         self._last_left_time = 0.0
 
@@ -1695,6 +1705,7 @@ class Overlay(QWidget):
         self,
         mods: Iterable[str],
         key: Optional[str] = None,
+        key_kind: str = "key",
     ) -> list[tuple[str, str]]:
         parts: list[tuple[str, str]] = [
             (modifier_label(self._cfg, mod), "mod")
@@ -1702,7 +1713,7 @@ class Overlay(QWidget):
             if mod in set(mods)
         ]
         if key is not None:
-            parts.append((key, "key"))
+            parts.append((key, key_kind))
 
         items: list[tuple[str, str]] = []
         for index, part in enumerate(parts):
@@ -1710,6 +1721,12 @@ class Overlay(QWidget):
                 items.append(("+", "plus"))
             items.append(part)
         return items
+
+    def _mouse_items(
+        self, mods: Iterable[str], label: str
+    ) -> list[tuple[str, str]]:
+        """Badges d'un clic ou d'un cran de molette, modificateurs compris."""
+        return self._combo_items(mods, label, key_kind="mouse")
 
     def _event_key_label(self, event: KeyEvent) -> str:
         if event.char:
@@ -1900,11 +1917,13 @@ class Overlay(QWidget):
 
     def _on_scroll(self, event: MouseEvent) -> None:
         now = time.monotonic()
+        mods = tuple(m for m in MODIFIER_ORDER if m in set(event.mods))
         recent = (
             self._scroll_row is not None
             and self._rows
             and self._rows[-1] is self._scroll_row
             and event.direction == self._scroll_direction
+            and mods == self._scroll_mods
             and now - self._scroll_time <= SCROLL_AGGREGATE_WINDOW
         )
         if recent:
@@ -1915,7 +1934,9 @@ class Overlay(QWidget):
                 if self._scroll_direction > 0
                 else self._cfg.scroll_down_label
             )
-            self._scroll_row.set_items([(f"{base} ×{self._scroll_count}", "mouse")])
+            self._scroll_row.set_items(
+                self._mouse_items(mods, f"{base} ×{self._scroll_count}")
+            )
             self._update_levels()
             self._relayout()
             self._bump()
@@ -1926,17 +1947,19 @@ class Overlay(QWidget):
         self._scroll_direction = event.direction
         self._scroll_count = 1
         self._scroll_time = now
+        self._scroll_mods = mods
         base = (
             self._cfg.scroll_up_label
             if event.direction > 0
             else self._cfg.scroll_down_label
         )
-        self._scroll_row = self._new_row([(base, "mouse")])
+        self._scroll_row = self._new_row(self._mouse_items(mods, base))
         self._last_left_row = None
 
     def _on_click(self, event: MouseEvent) -> None:
         button = event.button or "left"
         now = time.monotonic()
+        mods = tuple(m for m in MODIFIER_ORDER if m in set(event.mods))
 
         # Double / triple clic : on enrichit la ligne du clic précédent au lieu
         # d'empiler une nouvelle ligne.
@@ -1948,7 +1971,7 @@ class Overlay(QWidget):
             and now - self._last_left_time <= 0.9
         ):
             label = MULTI_CLICK_LABELS.get(event.count, MULTI_CLICK_LABELS[3])
-            self._last_left_row.set_items([(label, "mouse")])
+            self._last_left_row.set_items(self._mouse_items(mods, label))
             self._last_left_time = now
             self._update_levels()
             self._relayout()
@@ -1968,7 +1991,7 @@ class Overlay(QWidget):
         else:
             label = self._cfg.click_left_label
 
-        row = self._new_row([(label, "mouse")])
+        row = self._new_row(self._mouse_items(mods, label))
         if button == "left":
             self._last_left_row = row
             self._last_left_time = now
