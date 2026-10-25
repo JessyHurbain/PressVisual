@@ -19,6 +19,9 @@ plan, et n'apparaît que lorsqu'il y a quelque chose à montrer.
 
 - **Overlay moderne** : coins arrondis, fond sombre dégradé semi-transparent
   (type verre fumé), texte blanc contrasté, police système épurée.
+- **Apparence personnalisable** : une fenêtre de réglages avec aperçu en direct
+  permet de changer les couleurs, la police, l'opacité, les coins arrondis et
+  les marges, puis d'enregistrer le tout dans la configuration.
 - **Fenêtre sans bordure**, toujours au premier plan, déplaçable au clic-glisser.
 - **Apparition immédiate**, maintien configurable (2 s par défaut), puis fondu
   de disparition.
@@ -44,7 +47,7 @@ plan, et n'apparaît que lorsqu'il y a quelque chose à montrer.
 - **Filtrage de touches** par configuration (par exemple `F12` ou
   `print_screen`).
 - **Menu de notification** (system tray) : afficher/masquer, clics traversants,
-  masquage, choix du coin d'ancrage, quitter.
+  masquage, personnalisation de l'apparence, choix du coin d'ancrage, quitter.
 - **Multi-écrans** : positionnement aux quatre coins (haut/bas, gauche/droite)
   ou en bas au centre, sur l'écran où se trouve le curseur.
 - **Aucune donnée envoyée sur le réseau**. L'application est entièrement locale.
@@ -147,8 +150,32 @@ La bulle se place sur l'écran où se trouve le curseur, à la distance `margin`
 des bords. Elle peut aussi être déplacée librement au clic-glisser ; après un
 déplacement, PressVisual conserve les bords les plus proches du centre de
 l'écran, de sorte que la bulle grandisse vers le centre au fil des frappes au
-lieu de sortir par un bord. La position initiale au lancement se règle avec
-`--position` ou la clé `position` de `config.json`.
+lieu de sortir par un bord.
+
+Le coin choisi dans le sous-menu est **mémorisé automatiquement** dans
+`config.json` : PressVisual s'ouvre au même endroit au prochain lancement. Un
+déplacement libre ne modifie pas cette préférence, qui reste le dernier coin
+sélectionné. La position initiale se règle aussi avec `--position` ou la clé
+`position` de `config.json`.
+
+### Personnaliser l'apparence
+
+Clic droit sur l'icône de notification → **Personnaliser l'overlay…** ouvre une
+fenêtre de réglages avec un aperçu en direct :
+
+- **Couleurs** : fond (haut et bas du dégradé), texte, fond et texte des
+  touches, couleur d'accent des clics et des messages d'état. Les badges de
+  modificateurs, les bordures et les séparateurs sont dérivés de ces couleurs
+  pour rester cohérents.
+- **Mise en forme** : police, taille, opacité du fond, rayon des coins, marge
+  avec le bord de l'écran et largeur maximale.
+- **Réinitialiser** restaure les valeurs d'origine, **Annuler** ferme sans rien
+  changer et **Enregistrer** applique les réglages immédiatement puis les écrit
+  dans le fichier de configuration.
+
+Les réglages sont conservés au prochain lancement. Ils ne touchent ni au
+positionnement (le dernier coin choisi reste mémorisé) ni au contenu affiché
+(durée, nombre de lignes, clavier/souris).
 
 ### Raccourcis globaux
 
@@ -210,6 +237,11 @@ Les options de la ligne de commande sont prioritaires sur le fichier. Les clés
 inconnues sont ignorées avec un avertissement, et les valeurs hors limites sont
 automatiquement corrigées.
 
+Le choix d'un coin dans le menu de l'icône met à jour la clé `position` du
+fichier sans toucher aux autres clés ; si `config.json` n'existe pas encore, il
+est créé. La fenêtre d'apparence enregistre de la même façon ses propres clés.
+Le dossier qui contient le fichier doit donc être accessible en écriture.
+
 ### Exemple complet (valeurs par défaut)
 
 ```json
@@ -227,6 +259,13 @@ automatiquement corrigées.
   "position": "bottom-right",
   "concat_text": false,
   "typing_join_delay": 1.1,
+
+  "background_color": "#26282f",
+  "background_color_bottom": "#0e0f12",
+  "text_color": "#f6f7f9",
+  "key_background_color": "#f5f6f8",
+  "key_text_color": "#111216",
+  "accent_color": "#548eff",
 
   "capture_keyboard": true,
   "capture_mouse": true,
@@ -260,13 +299,19 @@ automatiquement corrigées.
 | --- | --- |
 | `display_duration` | Secondes de maintien après la dernière entrée (0,3 à 30). |
 | `fade_in_ms` / `fade_out_ms` | Durées des fondus d'apparition et de disparition. |
-| `opacity` | Opacité du fond sombre (0.15 à 1.0). |
+| `opacity` | Opacité du fond de l'overlay (0.15 à 1.0). |
 | `font_family` | Police ; vide = sélection automatique (Segoe UI, SF Pro, Inter…). |
 | `font_size` | Taille de police en points. |
 | `max_rows` | Nombre de lignes conservées à l'écran (les plus anciennes s'effacent). |
 | `max_width` | Largeur maximale du texte ; le début est tronqué avec `…`. |
 | `corner_radius` | Rayon des coins de la bulle. |
 | `margin` | Distance au bord de l'écran pour le positionnement initial. |
+| `background_color` | Couleur du haut du dégradé de fond (format `#RRGGBB`). |
+| `background_color_bottom` | Couleur du bas du dégradé de fond. |
+| `text_color` | Couleur du texte, des badges de modificateurs et des bordures. |
+| `key_background_color` | Fond des pastilles de touches. |
+| `key_text_color` | Texte des pastilles de touches. |
+| `accent_color` | Accent des clics souris, des messages d'état et de la molette. |
 | `position` | `top-left`, `top-right`, `bottom-left`, `bottom-right` ou `bottom-center`. |
 | `concat_text` | `false` (défaut) : une pastille par touche. `true` : les caractères s'ajoutent dans une ligne de texte. |
 | `typing_join_delay` | Pause (s) qui clôt la ligne de texte en mode `concat_text`. |
@@ -282,9 +327,16 @@ automatiquement corrigées.
 
 ### Style
 
-Les couleurs (fond, pastilles, accent bleu des clics) sont regroupées en haut de
-[`pressvisual.py`](pressvisual.py), dans les constantes `COLOR_*`, si vous souhaitez
-personnaliser l'apparence au-delà des options proposées.
+La fenêtre **Personnaliser l'overlay…** couvre l'essentiel des réglages
+visuels. Pour un changement plus fin, les couleurs acceptent aussi le format
+`#AARRGGBB` (alpha en premier) dans le fichier de configuration ; les badges de
+modificateurs, les bordures, le séparateur `+` et la couleur du texte sur les
+badges d'accent sont alors recalculés à partir de ces valeurs.
+
+Les réglages enregistrés par la fenêtre sont : `background_color`,
+`background_color_bottom`, `text_color`, `key_background_color`,
+`key_text_color`, `accent_color`, `opacity`, `font_family`, `font_size`,
+`max_width`, `corner_radius` et `margin`.
 
 ## Empaqueter en exécutable autonome
 
@@ -319,7 +371,9 @@ python -m PyInstaller --noconfirm --clean --onefile --windowed --name PressVisua
 ```
 
 Placez `config.json` **à côté de l'exécutable** si vous voulez une configuration
-persistante.
+persistante. Le coin choisi dans le menu y est enregistré automatiquement ; dans
+un dossier protégé en écriture (`C:\Program Files`, par exemple), lancez plutôt
+avec `--config "%APPDATA%\pressvisual-config.json"`.
 
 ### macOS — `PressVisual.app`
 
@@ -362,7 +416,8 @@ ou un `.deb` peuvent être construits à partir de cet exécutable.
   antivirus. C'est un faux positif lié à l'empaquetage ; signez le binaire ou
   distribuez une version `--onedir`.
 - Le fichier `config.json` n'est pas embarqué automatiquement dans le binaire :
-  il est lu à côté de l'exécutable au démarrage.
+  il est lu à côté de l'exécutable au démarrage, et le menu y enregistre le
+  dernier coin choisi.
 
 ## Dépannage
 
@@ -396,6 +451,13 @@ Utilisez le mode « fenêtré sans bordure ».
 
 **La bulle ne se déplace plus**
 Le mode clics traversants est probablement actif : `Ctrl + F11`.
+
+**Les réglages ne sont pas mémorisés**
+Le dossier de `config.json` n'est pas accessible en écriture (par exemple
+`C:\Program Files`) ou le fichier contient un JSON invalide : PressVisual
+fonctionne mais ne peut pas enregistrer le choix (position ou apparence).
+Utilisez un dossier inscriptible avec
+`--config "%APPDATA%\pressvisual-config.json"`.
 
 **Impossible de quitter**
 `Ctrl + F9`, clic droit sur l'icône → Quitter, ou `Ctrl + C` dans le terminal.

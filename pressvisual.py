@@ -12,6 +12,7 @@ tutoriels et formations en ligne :
 * affichage touche par touche (une pastille par frappe), avec concaténation du
   texte en option ;
 * clics gauche / droit / milieu, double-clic, molette (agrégée) ;
+* apparence personnalisable (couleurs, police, opacité) via une fenêtre dédiée ;
 * apparition immédiate, maintien configurable puis fondu de disparition ;
 * raccourcis globaux : afficher/masquer, clics traversants, masquage des frappes, quitter ;
 * icône de notification (system tray) pour piloter l'application sans clavier.
@@ -27,11 +28,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import signal
 import sys
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Iterable, Optional
 
@@ -67,13 +69,26 @@ try:
         QPainterPath,
         QPen,
         QPixmap,
+        QScreen,
     )
     from PyQt6.QtWidgets import (
         QApplication,
+        QColorDialog,
+        QDialog,
+        QDialogButtonBox,
+        QFontComboBox,
+        QFormLayout,
+        QGridLayout,
+        QGroupBox,
         QHBoxLayout,
+        QLabel,
         QMenu,
         QMessageBox,
+        QPushButton,
+        QScrollArea,
         QSizePolicy,
+        QSlider,
+        QSpinBox,
         QSystemTrayIcon,
         QVBoxLayout,
         QWidget,
@@ -189,20 +204,26 @@ SPECIAL_KEY_LABELS: dict[str, str] = {
     "media_next": "Suivant",
 }
 
-#: Palette de l'overlay.
-COLOR_PANEL_TOP = QColor(38, 40, 47)
-COLOR_PANEL_BOTTOM = QColor(14, 15, 18)
-COLOR_BORDER = QColor(255, 255, 255, 40)
-COLOR_BORDER_DRAG = QColor(255, 255, 255, 105)
-COLOR_TEXT = QColor(246, 247, 249)
-COLOR_MUTED = QColor(255, 255, 255, 130)
-COLOR_KEY_BG = QColor(245, 246, 248, 244)
-COLOR_KEY_TEXT = QColor(17, 18, 22)
-COLOR_MOD_BG = QColor(255, 255, 255, 28)
-COLOR_MOD_BORDER = QColor(255, 255, 255, 38)
-COLOR_ACCENT = QColor(84, 142, 255, 236)
-COLOR_ACCENT_SOFT = QColor(166, 196, 255, 245)
-COLOR_WHITE = QColor(255, 255, 255, 240)
+#: Couleurs personnalisables de l'overlay (format ``#RRGGBB`` ou ``#AARRGGBB``).
+APPEARANCE_COLOR_FIELDS: tuple[str, ...] = (
+    "background_color",
+    "background_color_bottom",
+    "text_color",
+    "key_background_color",
+    "key_text_color",
+    "accent_color",
+)
+
+#: Réglages enregistrés par la fenêtre de personnalisation.
+APPEARANCE_CONFIG_KEYS: tuple[str, ...] = (
+    *APPEARANCE_COLOR_FIELDS,
+    "opacity",
+    "font_family",
+    "font_size",
+    "max_width",
+    "corner_radius",
+    "margin",
+)
 
 #: Codes virtuels Windows du pavé numérique -> caractère affiché.
 #: (pynput fournit souvent ``char=None`` pour ces touches, car le pavé
@@ -271,6 +292,14 @@ class Config:
     concat_text: bool = False           # True = regrouper le texte, False = touche par touche
     typing_join_delay: float = 1.1     # délai de concaténation du texte (s)
 
+    # --- Couleurs (format #RRGGBB ou #AARRGGBB) ----------------------------
+    background_color: str = "#26282f"
+    background_color_bottom: str = "#0e0f12"
+    text_color: str = "#f6f7f9"
+    key_background_color: str = "#f5f6f8"
+    key_text_color: str = "#111216"
+    accent_color: str = "#548eff"
+
     # --- Capture -----------------------------------------------------------
     capture_keyboard: bool = True
     capture_mouse: bool = True
@@ -299,11 +328,17 @@ class Config:
     start_hidden: bool = False
     click_through_on_start: bool = False
 
+    #: Fichier d'où provient la configuration (non sérialisé, non comparable).
+    path: Optional[Path] = field(
+        default=None, repr=False, compare=False, init=False
+    )
+
     # ------------------------------------------------------------------
     @classmethod
     def load(cls, path: Path, warn) -> "Config":
         """Charge un fichier JSON en ignorant les clés inconnues."""
         config = cls()
+        config.path = path
         if not path.exists():
             return config
         try:
@@ -315,6 +350,10 @@ class Config:
             warn(f"Configuration ignorée ({path}) : un objet JSON est attendu.")
             return config
         for key, value in raw.items():
+            if key == "path":
+                # Champ interne (emplacement du fichier) : jamais chargé.
+                warn("Clé réservée ignorée : path")
+                continue
             if not hasattr(config, key):
                 warn(f"Clé de configuration inconnue ignorée : {key}")
                 continue
@@ -348,6 +387,16 @@ class Config:
         number("corner_radius", 0, 40, int, " px")
         number("margin", 0, 400, int, " px")
         number("typing_join_delay", 0.2, 10.0, float, " s")
+
+        for name in APPEARANCE_COLOR_FIELDS:
+            value = getattr(self, name)
+            color = QColor(value) if isinstance(value, str) else QColor()
+            if not color.isValid():
+                notes.append(
+                    f"{name} invalide ({value!r}) : couleur par défaut utilisée."
+                )
+                color = QColor(getattr(Config, name))
+            setattr(self, name, _color_to_text(color))
 
         if self.position not in POSITION_CHOICES:
             notes.append(
@@ -391,6 +440,74 @@ class Config:
             setattr(self, name, str(getattr(self, name) or "").strip())
 
         return notes
+
+
+    # ------------------------------------------------------------------
+    def remember_position(self, position: str) -> bool:
+        """Enregistre ``position`` dans le fichier JSON de configuration."""
+        if position not in POSITION_CHOICES:
+            return False
+        return self._update_config({"position": position}, "Position")
+
+    # ------------------------------------------------------------------
+    def save_appearance(self, values: dict[str, object]) -> bool:
+        """Enregistre les réglages d'apparence dans le fichier de configuration."""
+        payload = {key: values[key] for key in APPEARANCE_CONFIG_KEYS if key in values}
+        return self._update_config(payload, "Apparence")
+
+    # ------------------------------------------------------------------
+    def _update_config(self, values: dict[str, object], what: str) -> bool:
+        """Met à jour quelques clés du fichier JSON en conservant les autres.
+
+        Renvoie ``True`` si le fichier est à jour (ou s'il n'y a rien à
+        enregistrer). En cas d'échec, l'application continue normalement et
+        l'erreur est signalée sur la sortie d'erreur.
+        """
+        if self.path is None:
+            return True
+
+        path = self.path
+        data: dict[str, object] = {}
+        if path.exists():
+            try:
+                raw = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                sys.stderr.write(
+                    f"[{APP_NAME}] {what} non enregistrée ({path}) : {exc}\n"
+                )
+                return False
+            if not isinstance(raw, dict):
+                sys.stderr.write(
+                    f"[{APP_NAME}] {what} non enregistrée ({path}) : "
+                    "un objet JSON est attendu.\n"
+                )
+                return False
+            data = raw
+
+        changed = {
+            key: value for key, value in values.items() if data.get(key) != value
+        }
+        if not changed:
+            return True
+        data.update(changed)
+
+        temp_path = path.with_name(path.name + ".tmp")
+        try:
+            temp_path.write_text(
+                json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+            os.replace(temp_path, path)
+        except OSError as exc:
+            sys.stderr.write(
+                f"[{APP_NAME}] {what} non enregistrée ({path}) : {exc}\n"
+            )
+            try:
+                temp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            return False
+        return True
 
 
 def _as_bool(value: object, default: bool) -> bool:
@@ -824,6 +941,103 @@ def _with_alpha(color: QColor, factor: float) -> QColor:
     return result
 
 
+def _color_to_text(color: QColor) -> str:
+    """Forme ``#rrggbb`` (ou ``#aarrggbb`` si la couleur est translucide)."""
+    if color.alpha() == 255:
+        return color.name(QColor.NameFormat.HexRgb)
+    return color.name(QColor.NameFormat.HexArgb)
+
+
+def _config_color(config: Config, name: str) -> QColor:
+    """Couleur de configuration, avec repli sur la valeur par défaut."""
+    value = getattr(config, name)
+    color = QColor(value) if isinstance(value, str) else QColor()
+    return color if color.isValid() else QColor(getattr(Config, name))
+
+
+def _blend(color: QColor, other: QColor, factor: float) -> QColor:
+    """Mélange ``color`` vers ``other`` (0 = color, 1 = other)."""
+    factor = max(0.0, min(1.0, factor))
+    return QColor(
+        int(round(color.red() + (other.red() - color.red()) * factor)),
+        int(round(color.green() + (other.green() - color.green()) * factor)),
+        int(round(color.blue() + (other.blue() - color.blue()) * factor)),
+    )
+
+
+def _luminance(color: QColor) -> float:
+    """Luminance relative simplifiée (0 = noir, 1 = blanc)."""
+    return (
+        0.2126 * color.redF()
+        + 0.7152 * color.greenF()
+        + 0.0722 * color.blueF()
+    )
+
+
+@dataclass
+class Palette:
+    """Couleurs effectives de l'overlay, dérivées de la configuration."""
+
+    panel_top: QColor
+    panel_bottom: QColor
+    border: QColor
+    border_drag: QColor
+    text: QColor
+    muted: QColor
+    key_bg: QColor
+    key_text: QColor
+    mod_bg: QColor
+    mod_border: QColor
+    accent: QColor
+    accent_soft: QColor
+    on_accent: QColor
+
+    # ------------------------------------------------------------------
+    @classmethod
+    def from_config(cls, config: Config) -> "Palette":
+        def color(value: str, fallback: str) -> QColor:
+            parsed = QColor(value) if isinstance(value, str) else QColor()
+            return parsed if parsed.isValid() else QColor(fallback)
+
+        text = color(config.text_color, Config.text_color)
+        key_bg = color(config.key_background_color, Config.key_background_color)
+        key_text = color(config.key_text_color, Config.key_text_color)
+        accent = color(config.accent_color, Config.accent_color)
+
+        soft = _blend(accent, QColor(255, 255, 255), 0.48)
+        soft.setAlpha(245)
+        on_accent = (
+            QColor(0, 0, 0)
+            if _luminance(accent) > 0.55
+            else QColor(255, 255, 255)
+        )
+        on_accent.setAlpha(240)
+
+        return cls(
+            panel_top=color(config.background_color, Config.background_color),
+            panel_bottom=color(
+                config.background_color_bottom, Config.background_color_bottom
+            ),
+            border=_with_alpha(text, 40 / max(1, text.alpha())),
+            border_drag=_with_alpha(text, 105 / max(1, text.alpha())),
+            text=text,
+            muted=_with_alpha(text, 130 / max(1, text.alpha())),
+            key_bg=key_bg,
+            key_text=key_text,
+            mod_bg=_with_alpha(text, 28 / max(1, text.alpha())),
+            mod_border=_with_alpha(text, 38 / max(1, text.alpha())),
+            accent=accent,
+            accent_soft=soft,
+            on_accent=on_accent,
+        )
+
+    # ------------------------------------------------------------------
+    def update_from_config(self, config: Config) -> None:
+        """Met à jour la palette sur place (les badges la partagent)."""
+        fresh = Palette.from_config(config)
+        self.__dict__.update(fresh.__dict__)
+
+
 class Badge(QWidget):
     """Petite pastille arrondie affichant une touche, un modificateur, etc.
 
@@ -844,6 +1058,7 @@ class Badge(QWidget):
         label: str,
         kind: str,
         font: QFont,
+        palette: Palette,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -851,6 +1066,7 @@ class Badge(QWidget):
         self._kind = kind
         self._font = QFont(font)
         self._metrics = QFontMetrics(self._font)
+        self._palette = palette
         self._alpha = 1.0
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
@@ -887,12 +1103,12 @@ class Badge(QWidget):
         radius = min(9.0, rect.height() / 2.0)
 
         if self._kind == "plus":
-            painter.setPen(_with_alpha(COLOR_MUTED, alpha))
+            painter.setPen(_with_alpha(self._palette.muted, alpha))
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self._label)
             return
 
         if self._kind == "text":
-            painter.setPen(_with_alpha(COLOR_TEXT, alpha))
+            painter.setPen(_with_alpha(self._palette.text, alpha))
             painter.drawText(
                 self.rect(),
                 int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter),
@@ -901,7 +1117,7 @@ class Badge(QWidget):
             return
 
         if self._kind == "status":
-            painter.setPen(_with_alpha(COLOR_ACCENT_SOFT, alpha))
+            painter.setPen(_with_alpha(self._palette.accent_soft, alpha))
             painter.drawText(
                 self.rect(),
                 int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter),
@@ -911,15 +1127,15 @@ class Badge(QWidget):
 
         if self._kind == "mouse":
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(_with_alpha(COLOR_ACCENT, alpha))
+            painter.setBrush(_with_alpha(self._palette.accent, alpha))
             painter.drawRoundedRect(rect, radius, radius)
 
             dot_size = 6.0
             dot_x = 12.0
             dot_y = (rect.height() - dot_size) / 2.0
-            painter.setBrush(_with_alpha(COLOR_WHITE, alpha))
+            painter.setBrush(_with_alpha(self._palette.on_accent, alpha))
             painter.drawEllipse(QRectF(dot_x, dot_y, dot_size, dot_size))
-            painter.setPen(_with_alpha(COLOR_WHITE, alpha))
+            painter.setPen(_with_alpha(self._palette.on_accent, alpha))
             painter.drawText(
                 QRectF(dot_x + dot_size + 7, 0, rect.width() - dot_x - dot_size - 7, rect.height()),
                 int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter),
@@ -928,27 +1144,34 @@ class Badge(QWidget):
             return
 
         if self._kind == "mod":
-            painter.setBrush(_with_alpha(COLOR_MOD_BG, alpha))
-            painter.setPen(QPen(_with_alpha(COLOR_MOD_BORDER, alpha), 1.0))
+            painter.setBrush(_with_alpha(self._palette.mod_bg, alpha))
+            painter.setPen(QPen(_with_alpha(self._palette.mod_border, alpha), 1.0))
             painter.drawRoundedRect(rect, radius, radius)
-            painter.setPen(_with_alpha(COLOR_TEXT, alpha))
+            painter.setPen(_with_alpha(self._palette.text, alpha))
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self._label)
             return
 
         # Touche principale : pastille claire, texte sombre.
-        painter.setBrush(_with_alpha(COLOR_KEY_BG, alpha))
+        painter.setBrush(_with_alpha(self._palette.key_bg, alpha))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(rect, radius, radius)
-        painter.setPen(_with_alpha(COLOR_KEY_TEXT, alpha))
+        painter.setPen(_with_alpha(self._palette.key_text, alpha))
         painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self._label)
 
 
 class KeyRow(QWidget):
     """Une ligne de badges (une frappe ou une combinaison)."""
 
-    def __init__(self, font: QFont, parent: Optional[QWidget] = None) -> None:
+    def __init__(
+        self,
+        font: QFont,
+        palette: Palette,
+        parent: Optional[QWidget] = None,
+    ) -> None:
         super().__init__(parent)
         self._font = QFont(font)
+        self._palette = palette
+        self._items: list[tuple[str, str]] = []
         self._badges: list[Badge] = []
         self._alpha = 1.0
         self._layout = QHBoxLayout(self)
@@ -962,14 +1185,25 @@ class KeyRow(QWidget):
     # ------------------------------------------------------------------
     def set_items(self, items: Iterable[tuple[str, str]]) -> None:
         """Remplace le contenu de la ligne par ``[(libellé, type), ...]``."""
+        self._items = list(items)
+        self._rebuild()
+
+    # ------------------------------------------------------------------
+    def set_font(self, font: QFont) -> None:
+        """Change la police de la ligne et recrée ses badges."""
+        self._font = QFont(font)
+        self._rebuild()
+
+    # ------------------------------------------------------------------
+    def _rebuild(self) -> None:
         for badge in self._badges:
             self._layout.removeWidget(badge)
             badge.setParent(None)
             badge.deleteLater()
         self._badges.clear()
 
-        for label, kind in items:
-            badge = Badge(label, kind, self._font, parent=self)
+        for label, kind in self._items:
+            badge = Badge(label, kind, self._font, self._palette, parent=self)
             badge.set_alpha(self._alpha)
             self._layout.addWidget(badge)
             self._badges.append(badge)
@@ -997,19 +1231,8 @@ class Overlay(QWidget):
             | Qt.WindowType.WindowDoesNotAcceptFocus,
         )
         self._cfg = config
-        self._font_family = _choose_font_family(config)
-
-        self._badge_font = QFont(self._font_family)
-        self._badge_font.setPointSize(max(9, config.font_size - 1))
-        self._badge_font.setWeight(QFont.Weight.DemiBold)
-        self._badge_font.setLetterSpacing(
-            QFont.SpacingType.AbsoluteSpacing, 0.3
-        )
-
-        self._text_font = QFont(self._font_family)
-        self._text_font.setPointSize(config.font_size)
-        self._text_font.setWeight(QFont.Weight.Medium)
-        self._text_metrics = QFontMetrics(self._text_font)
+        self._palette = Palette.from_config(config)
+        self._rebuild_fonts()
 
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
@@ -1091,6 +1314,49 @@ class Overlay(QWidget):
         return self._position_name
 
     # ------------------------------------------------------------------
+    # Apparence et peinture
+    # ------------------------------------------------------------------
+    def _rebuild_fonts(self) -> None:
+        """Recalcule les polices à partir de la configuration."""
+        self._font_family = _choose_font_family(self._cfg)
+
+        self._badge_font = QFont(self._font_family)
+        self._badge_font.setPointSize(max(9, self._cfg.font_size - 1))
+        self._badge_font.setWeight(QFont.Weight.DemiBold)
+        self._badge_font.setLetterSpacing(
+            QFont.SpacingType.AbsoluteSpacing, 0.3
+        )
+
+        self._text_font = QFont(self._font_family)
+        self._text_font.setPointSize(self._cfg.font_size)
+        self._text_font.setWeight(QFont.Weight.Medium)
+        self._text_metrics = QFontMetrics(self._text_font)
+
+    def apply_appearance(self, values: dict[str, object]) -> None:
+        """Applique de nouveaux réglages d'apparence à l'overlay."""
+        for key, value in values.items():
+            if hasattr(self._cfg, key) and key != "path":
+                setattr(self._cfg, key, value)
+        self._cfg.validate()
+
+        self._rebuild_fonts()
+        self._palette.update_from_config(self._cfg)
+        for row in self._rows:
+            row.set_font(self._badge_font)
+        if self._text_row is not None:
+            self._render_text()
+
+        # Une marge différente doit replacer un coin préréglé ; un
+        # déplacement libre conserve sa position.
+        if self._position_name:
+            screen = QGuiApplication.screenAt(self._anchor)
+            if screen is None:
+                screen = QGuiApplication.screenAt(self.frameGeometry().center())
+            self._reset_anchor_position(self._position_name, screen)
+        self._relayout()
+        self.update()
+
+    # ------------------------------------------------------------------
     # Peinture et déplacement
     # ------------------------------------------------------------------
     def paintEvent(self, event) -> None:  # noqa: N802 - API Qt
@@ -1104,16 +1370,21 @@ class Overlay(QWidget):
 
         background_alpha = int(round(255 * self._cfg.opacity))
         gradient = QLinearGradient(rect.topLeft(), rect.bottomLeft())
-        top = QColor(COLOR_PANEL_TOP)
+        top = QColor(self._palette.panel_top)
         top.setAlpha(background_alpha)
-        bottom = QColor(COLOR_PANEL_BOTTOM)
+        bottom = QColor(self._palette.panel_bottom)
         bottom.setAlpha(background_alpha)
         gradient.setColorAt(0.0, top)
         gradient.setColorAt(1.0, bottom)
 
         painter.fillPath(path, gradient)
         painter.setPen(
-            QPen(COLOR_BORDER_DRAG if self._dragging else COLOR_BORDER, 1.0)
+            QPen(
+                self._palette.border_drag
+                if self._dragging
+                else self._palette.border,
+                1.0,
+            )
         )
         painter.drawPath(path)
 
@@ -1191,18 +1462,26 @@ class Overlay(QWidget):
     # Positionnement
     # ------------------------------------------------------------------
     def set_position(self, position: str, announce: bool = True) -> None:
-        """Place l'overlay dans un coin (ou en bas au centre) de l'écran."""
+        """Place l'overlay dans un coin et mémorise ce choix."""
         if position not in POSITION_CHOICES:
-            position = self._cfg.position
+            position = (
+                self._cfg.position
+                if self._cfg.position in POSITION_CHOICES
+                else "bottom-right"
+            )
+        self._cfg.position = position
         self._reset_anchor_position(position)
         self._relayout()
+        self._cfg.remember_position(position)
         if announce:
             self._status(
                 f"Position : {POSITION_LABELS.get(position, position)}"
             )
         self.state_changed.emit()
 
-    def _reset_anchor_position(self, position: str) -> None:
+    def _reset_anchor_position(
+        self, position: str, screen: Optional[QScreen] = None
+    ) -> None:
         if position not in POSITION_CHOICES:
             position = "bottom-right"
         self._position_name = position
@@ -1215,7 +1494,8 @@ class Overlay(QWidget):
         )
         self._vertical_mode = "top" if position.startswith("top") else "bottom"
 
-        screen = QGuiApplication.screenAt(QCursor.pos())
+        if screen is None:
+            screen = QGuiApplication.screenAt(QCursor.pos())
         if screen is None:
             screen = QGuiApplication.primaryScreen()
         if screen is None:
@@ -1342,7 +1622,7 @@ class Overlay(QWidget):
     # Lignes de l'overlay
     # ------------------------------------------------------------------
     def _new_row(self, items: Iterable[tuple[str, str]]) -> KeyRow:
-        row = KeyRow(self._badge_font, self)
+        row = KeyRow(self._badge_font, self._palette, self)
         row.set_items(items)
         self._rows.append(row)
         self._layout.addWidget(row)
@@ -1769,6 +2049,400 @@ class Overlay(QWidget):
         )
         self.state_changed.emit()
 
+    # ------------------------------------------------------------------
+    # Personnalisation
+    # ------------------------------------------------------------------
+    def edit_appearance(self) -> None:
+        """Ouvre la fenêtre d'apparence et enregistre les changements."""
+        # Suspend l'affichage pendant les réglages : les frappes saisies dans
+        # la fenêtre ne doivent pas apparaître dans l'overlay.
+        was_enabled = self._capture_enabled
+        accepted = QDialog.DialogCode.Rejected
+        if was_enabled:
+            self.set_capture_enabled(False)
+        try:
+            dialog = AppearanceDialog(self._cfg, self._font_family)
+            accepted = dialog.exec()
+        finally:
+            if was_enabled:
+                self.set_capture_enabled(True)
+        if accepted != QDialog.DialogCode.Accepted:
+            return
+
+        self.apply_appearance(dialog.values())
+        payload = {
+            key: getattr(self._cfg, key) for key in APPEARANCE_CONFIG_KEYS
+        }
+        if not self._cfg.save_appearance(payload):
+            QMessageBox.warning(
+                None,
+                f"{APP_NAME} — configuration",
+                "L'apparence a été appliquée, mais elle n'a pas pu être "
+                "enregistrée dans :\n"
+                f"{self._cfg.path}\n\n"
+                "Vérifiez que le dossier est accessible en écriture.",
+            )
+
+
+class ColorButton(QPushButton):
+    """Bouton affichant une couleur et ouvrant un sélecteur."""
+
+    color_changed = pyqtSignal()
+
+    def __init__(self, color: QColor, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self._color = QColor(color)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setIconSize(QSize(18, 18))
+        self.setMinimumWidth(148)
+        self.setToolTip("Cliquer pour choisir une couleur")
+        self.clicked.connect(self._pick)
+        self._refresh()
+
+    # ------------------------------------------------------------------
+    def color(self) -> QColor:
+        return QColor(self._color)
+
+    def set_color(self, color: QColor, emit: bool = True) -> None:
+        if not isinstance(color, QColor) or not color.isValid():
+            return
+        self._color = QColor(color)
+        self._refresh()
+        if emit:
+            self.color_changed.emit()
+
+    def _refresh(self) -> None:
+        swatch = QPixmap(18, 18)
+        swatch.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(swatch)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        for y in range(0, 18, 4):
+            for x in range(0, 18, 4):
+                light = (x // 4 + y // 4) % 2 == 0
+                painter.fillRect(
+                    x, y, 4, 4, QColor("#f2f4f7") if light else QColor("#cfd4dc")
+                )
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(self._color)
+        painter.drawRoundedRect(QRectF(1, 1, 16, 16), 4, 4)
+        painter.end()
+        self.setIcon(QIcon(swatch))
+
+        text = self._color.name(QColor.NameFormat.HexRgb).upper()
+        if self._color.alpha() < 255:
+            text += f"  {round(self._color.alpha() / 255 * 100)} %"
+        self.setText(text)
+
+    def _pick(self) -> None:
+        chosen = QColorDialog.getColor(
+            self._color, self, "Choisir une couleur"
+        )
+        if chosen.isValid():
+            self.set_color(chosen)
+
+
+class PreviewPanel(QWidget):
+    """Aperçu compact de l'overlay avec les réglages en cours."""
+
+    def __init__(
+        self,
+        config: Config,
+        font_family: str,
+        parent: Optional[QWidget] = None,
+    ) -> None:
+        super().__init__(parent)
+        self._config = config
+        self._palette = Palette.from_config(config)
+        self.setMinimumHeight(180)
+
+        self._layout = QVBoxLayout(self)
+        self._layout.setContentsMargins(20, 16, 20, 16)
+        self._layout.setSpacing(7)
+        self._layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        self._min_timer = QTimer(self)
+        self._min_timer.setSingleShot(True)
+        self._min_timer.timeout.connect(self._sync_minimum_size)
+
+        font = QFont(font_family)
+        font.setPointSize(max(9, config.font_size - 1))
+        font.setWeight(QFont.Weight.DemiBold)
+
+        self._rows: list[KeyRow] = []
+        samples: tuple[tuple[tuple[str, str], ...], ...] = (
+            (("Ctrl", "mod"), ("+", "plus"), ("C", "key")),
+            (("Maj", "mod"), ("+", "plus"), ("→", "key")),
+            (("Clic gauche", "mouse"),),
+            (("bonjour", "text"),),
+        )
+        for items in samples:
+            row = KeyRow(font, self._palette, self)
+            row.set_items(items)
+            self._layout.addWidget(row)
+            self._rows.append(row)
+        self._sync_minimum_size()
+
+    # ------------------------------------------------------------------
+    def _sync_minimum_size(self) -> None:
+        """Laisse l'aperçu grandir et défiler aux grandes tailles de police."""
+        self._layout.invalidate()
+        self._layout.activate()
+        minimum = self._layout.minimumSize()
+        self.setMinimumSize(minimum.width(), max(180, minimum.height()))
+
+    # ------------------------------------------------------------------
+    def update_appearance(self, config: Config, font_family: str) -> None:
+        self._config = config
+        self._palette.update_from_config(config)
+
+        font = QFont(font_family)
+        font.setPointSize(max(9, config.font_size - 1))
+        font.setWeight(QFont.Weight.DemiBold)
+        for row in self._rows:
+            row.set_font(font)
+        self._sync_minimum_size()
+        # Le QScrollArea réévalue la taille du widget après le layout : on
+        # réapplique la taille minimale une fois celui-ci stabilisé.
+        self._min_timer.start(0)
+        self.update()
+
+    # ------------------------------------------------------------------
+    def paintEvent(self, event) -> None:  # noqa: N802 - API Qt
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        painter.fillRect(self.rect(), QColor("#eceef2"))
+        checker = 12
+        for y in range(0, self.height(), checker):
+            for x in range(0, self.width(), checker):
+                if (x // checker + y // checker) % 2:
+                    painter.fillRect(x, y, checker, checker, QColor("#e2e5ea"))
+
+        rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        radius = float(self._config.corner_radius)
+        path = QPainterPath()
+        path.addRoundedRect(rect, radius, radius)
+
+        alpha = int(round(255 * self._config.opacity))
+        top = QColor(self._palette.panel_top)
+        top.setAlpha(alpha)
+        bottom = QColor(self._palette.panel_bottom)
+        bottom.setAlpha(alpha)
+        gradient = QLinearGradient(rect.topLeft(), rect.bottomLeft())
+        gradient.setColorAt(0.0, top)
+        gradient.setColorAt(1.0, bottom)
+        painter.fillPath(path, gradient)
+        painter.setPen(QPen(self._palette.border, 1.0))
+        painter.drawPath(path)
+
+
+class AppearanceDialog(QDialog):
+    """Fenêtre de personnalisation de l'apparence de l'overlay."""
+
+    COLOR_LABELS: tuple[tuple[str, str], ...] = (
+        ("background_color", "Fond (haut)"),
+        ("background_color_bottom", "Fond (bas)"),
+        ("text_color", "Texte"),
+        ("key_background_color", "Touches (fond)"),
+        ("key_text_color", "Touches (texte)"),
+        ("accent_color", "Accents"),
+    )
+
+    def __init__(
+        self,
+        config: Config,
+        font_family: str,
+        parent: Optional[QWidget] = None,
+    ) -> None:
+        super().__init__(parent)
+        self._base_config = config
+        self._updating = False
+        self.setWindowTitle(f"{APP_NAME} — Apparence")
+        self.setWindowIcon(build_app_icon())
+        self.setModal(True)
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        self.setMinimumWidth(580)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(18, 16, 18, 16)
+        outer.setSpacing(12)
+
+        title = QLabel("Personnaliser l'overlay", self)
+        title.setStyleSheet("font-size: 15pt; font-weight: 600;")
+        outer.addWidget(title)
+
+        subtitle = QLabel(
+            "Les couleurs, la police et la mise en forme sont appliquées à "
+            "l'overlay et enregistrées dans le fichier de configuration.",
+            self,
+        )
+        subtitle.setWordWrap(True)
+        outer.addWidget(subtitle)
+
+        colors_group = QGroupBox("Couleurs", self)
+        grid = QGridLayout(colors_group)
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(8)
+        self.color_buttons: dict[str, ColorButton] = {}
+        for index, (key, label) in enumerate(self.COLOR_LABELS):
+            row = index // 3
+            column = index % 3
+            cell = QVBoxLayout()
+            cell.setSpacing(4)
+            cell.addWidget(QLabel(label, colors_group))
+            button = ColorButton(_config_color(config, key), colors_group)
+            cell.addWidget(button)
+            grid.addLayout(cell, row, column)
+            self.color_buttons[key] = button
+        for column in range(3):
+            grid.setColumnStretch(column, 1)
+        outer.addWidget(colors_group)
+
+        form_group = QGroupBox("Mise en forme", self)
+        form = QFormLayout(form_group)
+        form.setHorizontalSpacing(14)
+        form.setVerticalSpacing(8)
+
+        self.font_combo = QFontComboBox(form_group)
+        self.font_combo.setCurrentFont(QFont(font_family))
+        form.addRow("Police", self.font_combo)
+
+        self.font_size = QSpinBox(form_group)
+        self.font_size.setRange(9, 40)
+        self.font_size.setSuffix(" pt")
+        self.font_size.setValue(config.font_size)
+        form.addRow("Taille", self.font_size)
+
+        opacity_row = QHBoxLayout()
+        self.opacity_slider = QSlider(Qt.Orientation.Horizontal, form_group)
+        self.opacity_slider.setRange(15, 100)
+        self.opacity_slider.setValue(round(config.opacity * 100))
+        self.opacity_slider.setMinimumWidth(200)
+        self.opacity_label = QLabel(form_group)
+        self.opacity_label.setMinimumWidth(46)
+        opacity_row.addWidget(self.opacity_slider, 1)
+        opacity_row.addWidget(self.opacity_label)
+        form.addRow("Opacité", opacity_row)
+
+        self.corner_radius = QSpinBox(form_group)
+        self.corner_radius.setRange(0, 40)
+        self.corner_radius.setSuffix(" px")
+        self.corner_radius.setValue(config.corner_radius)
+        form.addRow("Coins arrondis", self.corner_radius)
+
+        self.margin = QSpinBox(form_group)
+        self.margin.setRange(0, 400)
+        self.margin.setSuffix(" px")
+        self.margin.setValue(config.margin)
+        form.addRow("Marge écran", self.margin)
+
+        self.max_width = QSpinBox(form_group)
+        self.max_width.setRange(220, 1600)
+        self.max_width.setSingleStep(10)
+        self.max_width.setSuffix(" px")
+        self.max_width.setValue(config.max_width)
+        form.addRow("Largeur maximale", self.max_width)
+        outer.addWidget(form_group)
+
+        preview_group = QGroupBox("Aperçu", self)
+        preview_layout = QVBoxLayout(preview_group)
+        preview_layout.setContentsMargins(10, 10, 10, 10)
+        self.preview = PreviewPanel(config, font_family)
+        preview_scroll = QScrollArea(preview_group)
+        preview_scroll.setWidgetResizable(True)
+        preview_scroll.setWidget(self.preview)
+        preview_scroll.setMinimumHeight(160)
+        preview_scroll.setMaximumHeight(200)
+        preview_layout.addWidget(preview_scroll)
+        outer.addWidget(preview_group)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save
+            | QDialogButtonBox.StandardButton.Cancel,
+            self,
+        )
+        buttons.button(QDialogButtonBox.StandardButton.Save).setText("Enregistrer")
+        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText("Annuler")
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+
+        reset = QPushButton("Réinitialiser", self)
+        bottom = QHBoxLayout()
+        bottom.addWidget(reset)
+        bottom.addStretch(1)
+        bottom.addWidget(buttons)
+        outer.addLayout(bottom)
+
+        reset.clicked.connect(self._reset)
+        for button in self.color_buttons.values():
+            button.color_changed.connect(self._refresh_preview)
+        self.font_combo.currentFontChanged.connect(self._refresh_preview)
+        self.font_size.valueChanged.connect(self._refresh_preview)
+        self.opacity_slider.valueChanged.connect(self._refresh_preview)
+        self.corner_radius.valueChanged.connect(self._refresh_preview)
+        self.margin.valueChanged.connect(self._refresh_preview)
+        self.max_width.valueChanged.connect(self._refresh_preview)
+
+        self._refresh_preview()
+        self.adjustSize()
+        screen = QGuiApplication.screenAt(QCursor.pos())
+        if screen is None:
+            screen = QGuiApplication.primaryScreen()
+        if screen is not None:
+            geometry = self.frameGeometry()
+            geometry.moveCenter(screen.availableGeometry().center())
+            self.move(geometry.topLeft())
+        self.font_combo.setFocus()
+
+    # ------------------------------------------------------------------
+    def values(self) -> dict[str, object]:
+        """Réglages choisis, prêts à être appliqués et enregistrés."""
+        family = self.font_combo.currentFont().family().strip()
+        if not family:
+            family = self._base_config.font_family
+        payload: dict[str, object] = {
+            "opacity": self.opacity_slider.value() / 100.0,
+            "font_family": family,
+            "font_size": self.font_size.value(),
+            "max_width": self.max_width.value(),
+            "corner_radius": self.corner_radius.value(),
+            "margin": self.margin.value(),
+        }
+        for key in APPEARANCE_COLOR_FIELDS:
+            payload[key] = _color_to_text(self.color_buttons[key].color())
+        return payload
+
+    # ------------------------------------------------------------------
+    def _preview_config(self) -> Config:
+        config = replace(self._base_config)
+        for key, value in self.values().items():
+            setattr(config, key, value)
+        config.validate()
+        return config
+
+    def _refresh_preview(self) -> None:
+        if self._updating:
+            return
+        config = self._preview_config()
+        self.preview.update_appearance(config, _choose_font_family(config))
+        self.opacity_label.setText(f"{round(config.opacity * 100)} %")
+
+    def _reset(self) -> None:
+        defaults = Config()
+        self._updating = True
+        try:
+            for key, button in self.color_buttons.items():
+                button.set_color(QColor(getattr(defaults, key)), emit=False)
+            self.font_combo.setCurrentFont(QFont(_choose_font_family(defaults)))
+            self.font_size.setValue(defaults.font_size)
+            self.opacity_slider.setValue(round(defaults.opacity * 100))
+            self.corner_radius.setValue(defaults.corner_radius)
+            self.margin.setValue(defaults.margin)
+            self.max_width.setValue(defaults.max_width)
+        finally:
+            self._updating = False
+        self._refresh_preview()
+
 
 def _choose_font_family(config: Config) -> str:
     """Choisit une police moderne disponible sur le système."""
@@ -1898,6 +2572,10 @@ class TrayController(QObject):
         self.menu.addAction(self.act_click_through)
         self.menu.addAction(self.act_masking)
         self.menu.addSeparator()
+
+        self.act_appearance = QAction("Personnaliser l'overlay…", self)
+        self.act_appearance.triggered.connect(self._overlay.edit_appearance)
+        self.menu.addAction(self.act_appearance)
 
         self.position_menu = self.menu.addMenu("Position de l'overlay")
         self.position_group = QActionGroup(self)
@@ -2040,7 +2718,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     def warn(message: str) -> None:
         sys.stderr.write(f"[{APP_NAME}] {message}\n")
 
-    config_path = Path(args.config).expanduser() if args.config else _default_config_path()
+    config_path = (
+        Path(args.config).expanduser().resolve()
+        if args.config
+        else _default_config_path()
+    )
     config = Config.load(config_path, warn)
 
     if args.duration is not None:
