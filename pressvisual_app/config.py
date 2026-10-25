@@ -88,8 +88,14 @@ class Config:
     click_left_label: str = "Clic gauche"
     click_right_label: str = "Clic droit"
     click_middle_label: str = "Clic milieu"
+    #: Boutons latéraux de la souris (précédent / suivant).
+    click_back_label: str = "Précédent"
+    click_forward_label: str = "Suivant"
     scroll_up_label: str = "Scroll ↑"
     scroll_down_label: str = "Scroll ↓"
+    #: Molette inclinable (défilement horizontal).
+    scroll_left_label: str = "Scroll ←"
+    scroll_right_label: str = "Scroll →"
 
     # --- Raccourcis globaux (chaîne vide = désactivé) ----------------------
     hotkey_toggle: str = "ctrl+f12"
@@ -234,8 +240,12 @@ class Config:
             "click_left_label",
             "click_right_label",
             "click_middle_label",
+            "click_back_label",
+            "click_forward_label",
             "scroll_up_label",
             "scroll_down_label",
+            "scroll_left_label",
+            "scroll_right_label",
             "hotkey_toggle",
             "hotkey_click_through",
             "hotkey_masking",

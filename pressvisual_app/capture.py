@@ -48,11 +48,31 @@ NUMPAD_VK_CHARS: dict[int, str] = {
     111: "/",
 }
 
-#: Noms des boutons de souris.
+def _side_button_names() -> dict[object, str]:
+    """Boutons latéraux exposés par pynput sur la plateforme courante.
+
+    Windows nomme ces boutons ``Button.x1`` et ``Button.x2``, X11 les numérote
+    ``Button.button8`` et ``Button.button9``. macOS ne les transmet pas.
+    """
+    names: dict[object, str] = {}
+    for attributes, canonical in (
+        (("x1", "button8"), "back"),
+        (("x2", "button9"), "forward"),
+    ):
+        for attribute in attributes:
+            button = getattr(mouse.Button, attribute, None)
+            if button is not None:
+                names[button] = canonical
+                break
+    return names
+
+
+#: Noms des boutons de souris (``back``/``forward`` = boutons latéraux).
 MOUSE_BUTTON_NAMES: dict[object, str] = {
     mouse.Button.left: "left",
     mouse.Button.right: "right",
     mouse.Button.middle: "middle",
+    **_side_button_names(),
 }
 
 # ---------------------------------------------------------------------------
@@ -268,15 +288,18 @@ class InputListener(threading.Thread):
 
     def _on_scroll(self, x, y, dx, dy) -> None:
         try:
+            # Un événement peut porter les deux axes (molette diagonale) : le
+            # défilement vertical reste prioritaire, comme auparavant.
             if dy:
-                direction = 1 if dy > 0 else -1
+                axis, direction = "vertical", 1 if dy > 0 else -1
             elif dx:
-                direction = 1 if dx > 0 else -1
+                axis, direction = "horizontal", 1 if dx > 0 else -1
             else:
                 return
             self._bridge.mouse_event.emit(
                 MouseEvent(
                     kind="scroll",
+                    axis=axis,
                     direction=direction,
                     x=int(x),
                     y=int(y),

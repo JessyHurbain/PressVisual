@@ -36,8 +36,11 @@ plan, et n'apparaît que lorsqu'il y a quelque chose à montrer.
 - **Pavé numérique** : chiffres `0` à `9`, opérateurs `+ - * /`, séparateur
   décimal et touche Entrée reconnus, y compris lorsque `pynput` ne fournit pas
   de caractère pour ces touches.
-- **Souris** : clic gauche, clic droit, clic milieu, double-clic, triple-clic et
-  molette (les crans successifs sont agrégés : `Scroll ↓ ×3`).
+- **Souris** : clic gauche, clic droit, clic milieu, boutons latéraux
+  (`[Précédent]`, `[Suivant]`), double-clic, triple-clic et molette, verticale
+  (`Scroll ↑`, `Scroll ↓`) comme horizontale sur une molette inclinable
+  (`Scroll ←`, `Scroll →`). Les crans successifs sont agrégés par axe :
+  `Scroll ↓ ×3`, `Scroll → ×2`.
 - **Combinaisons souris** : les modificateurs maintenus accompagnent la molette
   et les clics, comme au clavier : `[Ctrl] + [Scroll ↑]` (zoom),
   `[Maj] + [Clic droit]`, `[Ctrl] + [Clic milieu]`, etc.
@@ -311,8 +314,12 @@ Le dossier qui contient le fichier doit donc être accessible en écriture.
   "click_left_label": "Clic gauche",
   "click_right_label": "Clic droit",
   "click_middle_label": "Clic milieu",
+  "click_back_label": "Précédent",
+  "click_forward_label": "Suivant",
   "scroll_up_label": "Scroll ↑",
   "scroll_down_label": "Scroll ↓",
+  "scroll_left_label": "Scroll ←",
+  "scroll_right_label": "Scroll →",
 
   "hotkey_toggle": "ctrl+f12",
   "hotkey_click_through": "ctrl+f11",
@@ -511,6 +518,13 @@ quittez et relancez.
 Les hooks globaux de `pynput` nécessitent X11. Sous Wayland, connectez-vous à une
 session « Xorg » pour un fonctionnement complet ; XWayland peut autoriser
 l'affichage mais la capture globale peut être incomplète selon le compositeur.
+
+**Les boutons latéraux de la souris ne s'affichent pas**
+`pynput` ne les transmet que sous Windows (boutons `x1`/`x2`) et sous X11
+(numéros `8`/`9`). Sous macOS, seuls les boutons gauche, droit et milieu sont
+accessibles : les boutons latéraux n'apparaissent pas. Certaines souris
+assignent d'autres numéros à leurs boutons via leur pilote ; dans ce cas ils
+sont ignorés, comme tout bouton inconnu.
 
 **L'overlay n'apparaît pas dans l'enregistrement**
 Utilisez une capture d'**écran** (display capture) plutôt qu'une capture de

@@ -320,8 +320,16 @@
         <translation>Reset</translation>
     </message>
     <message>
+        <source>Scroll ←</source>
+        <translation>Scroll ←</translation>
+    </message>
+    <message>
         <source>Scroll ↑</source>
         <translation>Scroll ↑</translation>
+    </message>
+    <message>
+        <source>Scroll →</source>
+        <translation>Scroll →</translation>
     </message>
     <message>
         <source>Scroll ↓</source>

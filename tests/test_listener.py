@@ -6,6 +6,7 @@ import pytest
 from pynput import keyboard, mouse
 
 import pressvisual
+from pressvisual_app import capture as capture_module
 
 
 class Recorder:
@@ -185,6 +186,89 @@ def test_unknown_button_is_ignored(recorder, config):
     assert recorder.mouse == []
 
 
+def _side_button(canonical: str):
+    """Bouton pynput correspondant au bouton latéral demandé."""
+    for button, name in pressvisual.MOUSE_BUTTON_NAMES.items():
+        if name == canonical:
+            return button
+    pytest.skip(f"pynput n'expose pas {canonical} sur cette plateforme")
+
+
+def test_side_button_names_use_windows_attributes(monkeypatch):
+    class FakeButton:
+        x1 = object()
+        x2 = object()
+
+    class FakeMouse:
+        Button = FakeButton
+
+    monkeypatch.setattr(capture_module, "mouse", FakeMouse)
+
+    assert capture_module._side_button_names() == {
+        FakeButton.x1: "back",
+        FakeButton.x2: "forward",
+    }
+
+
+def test_side_button_names_use_x11_numbers(monkeypatch):
+    class FakeButton:
+        button8 = object()
+        button9 = object()
+
+    class FakeMouse:
+        Button = FakeButton
+
+    monkeypatch.setattr(capture_module, "mouse", FakeMouse)
+
+    assert capture_module._side_button_names() == {
+        FakeButton.button8: "back",
+        FakeButton.button9: "forward",
+    }
+
+
+def test_side_button_names_empty_without_support(monkeypatch):
+    class FakeButton:
+        pass
+
+    class FakeMouse:
+        Button = FakeButton
+
+    monkeypatch.setattr(capture_module, "mouse", FakeMouse)
+
+    assert capture_module._side_button_names() == {}
+
+
+def test_side_buttons_are_reported(recorder, config):
+    listener = make_listener(recorder, config)
+
+    listener._on_click(10, 10, _side_button("back"), True)
+    listener._on_click(10, 10, _side_button("forward"), True)
+
+    assert [(event.kind, event.button) for event in recorder.mouse] == [
+        ("click", "back"),
+        ("click", "forward"),
+    ]
+
+
+def test_side_click_carries_modifiers(recorder, config):
+    listener = make_listener(recorder, config)
+
+    listener._on_press(keyboard.Key.shift)
+    listener._on_click(10, 10, _side_button("back"), True)
+
+    assert recorder.mouse[0].mods == ("shift",)
+
+
+def test_side_clicks_are_never_aggregated(recorder, config):
+    listener = make_listener(recorder, config)
+    button = _side_button("back")
+
+    listener._on_click(10, 10, button, True)
+    listener._on_click(11, 10, button, True)
+
+    assert [event.count for event in recorder.mouse] == [1, 1]
+
+
 def test_double_click_is_detected(recorder, config):
     listener = make_listener(recorder, config)
 
@@ -219,9 +303,11 @@ def test_vertical_scroll_carries_modifiers(recorder, config):
     listener._on_scroll(5, 5, 0, 1)
     listener._on_scroll(5, 5, 0, -2)
 
-    assert [(event.kind, event.direction) for event in recorder.mouse] == [
-        ("scroll", 1),
-        ("scroll", -1),
+    assert [
+        (event.kind, event.axis, event.direction) for event in recorder.mouse
+    ] == [
+        ("scroll", "vertical", 1),
+        ("scroll", "vertical", -1),
     ]
     assert all(event.mods == ("shift",) for event in recorder.mouse)
 
@@ -230,10 +316,21 @@ def test_horizontal_scroll_is_supported(recorder, config):
     listener = make_listener(recorder, config)
 
     listener._on_scroll(0, 0, -1, 0)
+    listener._on_scroll(0, 0, 2, 0)
 
-    assert [(event.kind, event.direction) for event in recorder.mouse] == [
-        ("scroll", -1)
-    ]
+    assert [
+        (event.kind, event.axis, event.direction) for event in recorder.mouse
+    ] == [("scroll", "horizontal", -1), ("scroll", "horizontal", 1)]
+
+
+def test_diagonal_scroll_uses_vertical_axis(recorder, config):
+    listener = make_listener(recorder, config)
+
+    listener._on_scroll(0, 0, -1, 1)
+
+    assert [
+        (event.kind, event.axis, event.direction) for event in recorder.mouse
+    ] == [("scroll", "vertical", 1)]
 
 
 def test_empty_scroll_is_ignored(recorder, config):

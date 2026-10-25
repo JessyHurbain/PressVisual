@@ -27,9 +27,10 @@ class MouseEvent:
     """Un clic ou un cran de molette."""
 
     kind: str                       # "click" | "scroll"
-    button: Optional[str] = None    # "left" | "right" | "middle"
+    button: Optional[str] = None    # "left" | "right" | "middle" | "back" | "forward"
     count: int = 1
-    direction: int = 0              # +1 haut, -1 bas (molette)
+    direction: int = 0              # +1 haut/droite, -1 bas/gauche (molette)
+    axis: str = "vertical"          # "vertical" | "horizontal" (molette inclinable)
     x: int = 0
     y: int = 0
     mods: tuple[str, ...] = ()      # Ctrl / Alt / Maj / Win maintenus

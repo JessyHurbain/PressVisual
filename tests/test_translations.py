@@ -24,8 +24,12 @@ LABEL_FIELDS = (
     "click_left_label",
     "click_right_label",
     "click_middle_label",
+    "click_back_label",
+    "click_forward_label",
     "scroll_up_label",
     "scroll_down_label",
+    "scroll_left_label",
+    "scroll_right_label",
 )
 
 

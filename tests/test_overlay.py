@@ -225,6 +225,8 @@ def test_click_with_control_shows_both_badges(overlay):
         ("left", "Clic gauche"),
         ("right", "Clic droit"),
         ("middle", "Clic milieu"),
+        ("back", "Précédent"),
+        ("forward", "Suivant"),
     ],
 )
 def test_click_labels(overlay, button, label):
@@ -233,12 +235,65 @@ def test_click_labels(overlay, button, label):
     assert items(overlay) == [[(label, "mouse")]]
 
 
+def test_side_click_with_control_shows_both_badges(overlay):
+    overlay._on_click(MouseEvent(kind="click", button="back", mods=("ctrl",)))
+
+    assert items(overlay) == [
+        [("Ctrl", "mod"), ("+", "plus"), ("Précédent", "mouse")]
+    ]
+
+
+def test_side_button_labels_are_configurable(overlay, config):
+    config.click_forward_label = "Bouton 5"
+
+    overlay._on_click(MouseEvent(kind="click", button="forward"))
+
+    assert items(overlay) == [[("Bouton 5", "mouse")]]
+
+
+def test_side_click_is_never_a_double_click(overlay):
+    overlay._on_click(MouseEvent(kind="click", button="back", count=2))
+
+    assert items(overlay) == [[("Précédent", "mouse")]]
+
+
 def test_scroll_is_aggregated(overlay):
     overlay._on_scroll(MouseEvent(kind="scroll", direction=1))
     overlay._on_scroll(MouseEvent(kind="scroll", direction=1))
     overlay._on_scroll(MouseEvent(kind="scroll", direction=1))
 
     assert items(overlay) == [[("Scroll ↑ ×3", "mouse")]]
+
+
+def test_horizontal_scroll_has_its_own_labels(overlay):
+    overlay._on_scroll(MouseEvent(kind="scroll", axis="horizontal", direction=1))
+    overlay._on_scroll(MouseEvent(kind="scroll", axis="horizontal", direction=-1))
+
+    assert items(overlay) == [
+        [("Scroll →", "mouse")],
+        [("Scroll ←", "mouse")],
+    ]
+
+
+def test_horizontal_scroll_is_aggregated_separately(overlay):
+    overlay._on_scroll(MouseEvent(kind="scroll", axis="vertical", direction=1))
+    overlay._on_scroll(MouseEvent(kind="scroll", axis="horizontal", direction=1))
+    overlay._on_scroll(MouseEvent(kind="scroll", axis="horizontal", direction=1))
+
+    assert items(overlay) == [
+        [("Scroll ↑", "mouse")],
+        [("Scroll → ×2", "mouse")],
+    ]
+
+
+def test_horizontal_scroll_carries_modifiers(overlay):
+    overlay._on_scroll(
+        MouseEvent(kind="scroll", axis="horizontal", direction=-1, mods=("shift",))
+    )
+
+    assert items(overlay) == [
+        [("Maj", "mod"), ("+", "plus"), ("Scroll ←", "mouse")]
+    ]
 
 
 def test_scroll_direction_change_starts_new_row(overlay):

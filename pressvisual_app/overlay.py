@@ -87,6 +87,7 @@ class Overlay(QWidget):
         self._combo_row: Optional[KeyRow] = None
         self._scroll_row: Optional[KeyRow] = None
         self._scroll_direction = 0
+        self._scroll_axis = "vertical"
         self._scroll_count = 0
         self._scroll_time = 0.0
         self._scroll_mods: tuple[str, ...] = ()
@@ -746,22 +747,20 @@ class Overlay(QWidget):
     def _on_scroll(self, event: MouseEvent) -> None:
         now = time.monotonic()
         mods = tuple(m for m in MODIFIER_ORDER if m in set(event.mods))
+        axis = event.axis or "vertical"
         recent = (
             self._scroll_row is not None
             and self._rows
             and self._rows[-1] is self._scroll_row
             and event.direction == self._scroll_direction
+            and axis == self._scroll_axis
             and mods == self._scroll_mods
             and now - self._scroll_time <= SCROLL_AGGREGATE_WINDOW
         )
         if recent:
             self._scroll_count += 1
             self._scroll_time = now
-            base = _t(
-                self._cfg.scroll_up_label
-                if self._scroll_direction > 0
-                else self._cfg.scroll_down_label
-            )
+            base = self._scroll_label(axis, self._scroll_direction)
             self._scroll_row.set_items(
                 self._mouse_items(mods, f"{base} ×{self._scroll_count}")
             )
@@ -773,16 +772,29 @@ class Overlay(QWidget):
         self._flush_typing()
         self._close_combo(remove=True)
         self._scroll_direction = event.direction
+        self._scroll_axis = axis
         self._scroll_count = 1
         self._scroll_time = now
         self._scroll_mods = mods
-        base = _t(
-            self._cfg.scroll_up_label
-            if event.direction > 0
-            else self._cfg.scroll_down_label
-        )
+        base = self._scroll_label(axis, event.direction)
         self._scroll_row = self._new_row(self._mouse_items(mods, base))
         self._last_left_row = None
+
+    def _scroll_label(self, axis: str, direction: int) -> str:
+        """Libellé d'un cran de molette, selon l'axe et le sens."""
+        if axis == "horizontal":
+            label = (
+                self._cfg.scroll_right_label
+                if direction > 0
+                else self._cfg.scroll_left_label
+            )
+        else:
+            label = (
+                self._cfg.scroll_up_label
+                if direction > 0
+                else self._cfg.scroll_down_label
+            )
+        return _t(label)
 
     def _on_click(self, event: MouseEvent) -> None:
         button = event.button or "left"
@@ -814,6 +826,10 @@ class Overlay(QWidget):
             label = _t(self._cfg.click_right_label)
         elif button == "middle":
             label = _t(self._cfg.click_middle_label)
+        elif button == "back":
+            label = _t(self._cfg.click_back_label)
+        elif button == "forward":
+            label = _t(self._cfg.click_forward_label)
         elif event.count >= 2:
             label = _t(MULTI_CLICK_LABELS.get(event.count, MULTI_CLICK_LABELS[3]))
         else:
