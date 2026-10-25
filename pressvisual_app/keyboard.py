@@ -17,7 +17,7 @@ from PyQt6.QtCore import QRectF, QSize, Qt
 from PyQt6.QtGui import QFont, QFontMetrics, QPainter, QPen
 from PyQt6.QtWidgets import QHBoxLayout, QSizePolicy, QWidget
 
-from .config import Config
+from .config import KEYBOARD_SCALE_MAX, KEYBOARD_SCALE_MIN, Config
 from .i18n import _t
 from .mouse import MouseView
 from .theme import Palette, _with_alpha
@@ -260,9 +260,12 @@ class KeyboardView(QWidget):
         self._cfg = config
         self._palette = palette
         self._definition = layout_for(config.keyboard_layout)
+        self._base_font = QFont(font)
+        self._base_small_font = QFont(font)
+        self._base_small_font.setPointSize(max(7, font.pointSize() - 3))
+        self._scale = 1.0
         self._font = QFont(font)
-        self._small_font = QFont(font)
-        self._small_font.setPointSize(max(7, font.pointSize() - 3))
+        self._small_font = QFont(self._base_small_font)
         self._active: frozenset[str] = frozenset()
         self._modifiers: frozenset[str] = frozenset()
         self._masked = False
@@ -277,9 +280,34 @@ class KeyboardView(QWidget):
         return self._definition
 
     def set_font(self, font: QFont) -> None:
-        self._font = QFont(font)
-        self._small_font = QFont(font)
-        self._small_font.setPointSize(max(7, font.pointSize() - 3))
+        """Change la police de base ; la taille réglée est conservée."""
+        self._base_font = QFont(font)
+        self._base_small_font = QFont(font)
+        self._base_small_font.setPointSize(max(7, font.pointSize() - 3))
+        self._apply_scale()
+
+    def set_scale(self, scale: float) -> None:
+        """Agrandit ou réduit le clavier (police et touches comprises)."""
+        scale = min(KEYBOARD_SCALE_MAX, max(KEYBOARD_SCALE_MIN, float(scale)))
+        if scale == self._scale:
+            return
+        self._scale = scale
+        self._apply_scale()
+
+    @property
+    def scale(self) -> float:
+        return self._scale
+
+    def _apply_scale(self) -> None:
+        """Recalcule les polices effectives à partir du facteur d'échelle."""
+        self._font = QFont(self._base_font)
+        self._font.setPointSizeF(
+            max(4.0, self._base_font.pointSizeF() * self._scale)
+        )
+        self._small_font = QFont(self._base_small_font)
+        self._small_font.setPointSizeF(
+            max(4.0, self._base_small_font.pointSizeF() * self._scale)
+        )
         self.updateGeometry()
         self.update()
 
@@ -327,16 +355,22 @@ class KeyboardView(QWidget):
     # Dimensions
     # ------------------------------------------------------------------
     def _unit(self) -> float:
-        metrics = QFontMetrics(self._font)
-        return max(metrics.height() * 1.8, metrics.horizontalAdvance("W") + 12.0)
+        """Largeur d'une touche : mesurée sur la police de base, puis réduite."""
+        metrics = QFontMetrics(self._base_font)
+        base = max(metrics.height() * 1.8, metrics.horizontalAdvance("W") + 12.0)
+        return base * self._scale
 
     def _key_height(self) -> float:
-        return float(QFontMetrics(self._font).height() + 16)
+        return float(QFontMetrics(self._base_font).height() + 16) * self._scale
+
+    def _gap(self, gap: float) -> float:
+        """Espacement réduit avec le clavier, pour garder les mêmes proportions."""
+        return max(1.0, gap * self._scale)
 
     def sizeHint(self) -> QSize:  # noqa: N802 - API Qt
         rows = len(self._definition.rows)
         width = self._definition.width * self._unit()
-        height = rows * self._key_height() + (rows - 1) * self.ROW_GAP
+        height = rows * self._key_height() + (rows - 1) * self._gap(self.ROW_GAP)
         return QSize(round(width), round(height))
 
     # ------------------------------------------------------------------
@@ -383,12 +417,18 @@ class KeyboardView(QWidget):
 
         label = self._label(key)
         font = QFont(self._small_font) if len(label) > 3 else QFont(self._font)
-        available = int(max(10.0, rect.width() - 8))
+        padding = max(4.0, 8.0 * self._scale)
+        available = int(max(10.0, rect.width() - padding))
         metrics = QFontMetrics(font)
         # Les libellés longs (« Verr Maj », « Entrée ») rétrécissent plutôt
-        # que d'être tronqués dans une touche étroite.
-        while metrics.horizontalAdvance(label) > available and font.pointSize() > 8:
-            font.setPointSize(font.pointSize() - 1)
+        # que d'être tronqués dans une touche étroite. Le plancher suit la
+        # taille du clavier, sinon les petites tailles tronquent sans essayer.
+        floor = max(4.0, 6.0 * self._scale)
+        while (
+            metrics.horizontalAdvance(label) > available
+            and font.pointSizeF() > floor
+        ):
+            font.setPointSizeF(font.pointSizeF() - 0.5)
             metrics = QFontMetrics(font)
         painter.setFont(font)
         painter.setPen(main_color)
@@ -424,20 +464,21 @@ class KeyboardView(QWidget):
 
         unit = self._unit()
         height = self._key_height()
+        gap = self._gap(self.KEY_GAP)
         y = 0.0
         for row in self._definition.rows:
             x = 0.0
             for key in row:
                 advance = key.width * unit
                 rect = QRectF(
-                    x + self.KEY_GAP / 2.0,
+                    x + gap / 2.0,
                     y,
-                    max(6.0, advance - self.KEY_GAP),
+                    max(4.0, advance - gap),
                     height,
                 )
                 self._paint_key(painter, key, rect)
                 x += advance
-            y += height + self.ROW_GAP
+            y += height + self._gap(self.ROW_GAP)
 
 
 class InputView(QWidget):
@@ -462,6 +503,7 @@ class InputView(QWidget):
         self._layout.setAlignment(Qt.AlignmentFlag.AlignBottom)
 
         self.keyboard = KeyboardView(config, font, palette, self)
+        self.keyboard.set_scale(config.keyboard_scale)
         self.mouse = MouseView(palette, self)
         self._layout.addWidget(self.keyboard, 0, Qt.AlignmentFlag.AlignBottom)
         self._layout.addWidget(self.mouse, 0, Qt.AlignmentFlag.AlignBottom)
@@ -479,8 +521,14 @@ class InputView(QWidget):
         """Relit la configuration (aperçu de la fenêtre d'apparence)."""
         self._cfg = config
         self.keyboard.set_config(config)
+        self.keyboard.set_scale(config.keyboard_scale)
         self._sync_mouse()
         self._apply_visibility()
+
+    def set_scale(self, scale: float) -> None:
+        """Applique la taille du clavier choisie avec la poignée."""
+        self.keyboard.set_scale(scale)
+        self._sync_mouse()
 
     def refresh_layout(self) -> None:
         self.keyboard.refresh_layout()

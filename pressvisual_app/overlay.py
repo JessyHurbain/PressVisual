@@ -9,8 +9,11 @@ from PyQt6.QtCore import (
     QAbstractAnimation,
     QEasingCurve,
     QPoint,
+    QPointF,
     QPropertyAnimation,
+    QRect,
     QRectF,
+    QSize,
     Qt,
     QTimer,
     pyqtSignal,
@@ -30,7 +33,12 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import QDialog, QMessageBox, QVBoxLayout, QWidget
 
 from .appearance import AppearanceDialog, _choose_font_family
-from .config import APPEARANCE_CONFIG_KEYS, Config
+from .config import (
+    APPEARANCE_CONFIG_KEYS,
+    KEYBOARD_SCALE_MAX,
+    KEYBOARD_SCALE_MIN,
+    Config,
+)
 from .constants import APP_NAME
 from .events import KeyEvent, MouseEvent
 from .i18n import _t
@@ -45,7 +53,7 @@ from .keymap import (
     should_use_combo,
 )
 from .mouse import MOUSE_BUTTONS, MOUSE_SCROLL_FLASH_MS
-from .theme import Palette
+from .theme import Palette, _with_alpha
 from .widgets import KeyRow
 
 #: Longueur maximale du tampon de texte affiché.
@@ -54,6 +62,8 @@ MAX_TEXT_LENGTH = 200
 SCROLL_AGGREGATE_WINDOW = 0.9
 #: Nombre maximal de touches allumées simultanément (sécurité anti-blocage).
 KEYBOARD_MAX_LIT = 16
+#: Côté de la zone de la poignée qui redimensionne le clavier (px).
+RESIZE_GRIP_SIZE = 22
 
 class Overlay(QWidget):
     """Fenêtre flottante affichant les frappes et les clics."""
@@ -108,6 +118,10 @@ class Overlay(QWidget):
         self._mouse_scroll: Optional[tuple[str, int]] = None
         self._dragging = False
         self._drag_origin = QPoint(0, 0)
+        self._resizing = False
+        self._resize_start = QPoint(0, 0)
+        self._resize_start_scale = 1.0
+        self._resize_start_size = QSize(0, 0)
         self._fade_target = "idle"
 
         # Ancrage : bords conservés lors des changements de taille (coin
@@ -313,12 +327,31 @@ class Overlay(QWidget):
         painter.setPen(
             QPen(
                 self._palette.border_drag
-                if self._dragging
+                if self._dragging or self._resizing
                 else self._palette.border,
                 1.0,
             )
         )
         painter.drawPath(path)
+        self._paint_resize_grip(painter)
+
+    def _paint_resize_grip(self, painter: QPainter) -> None:
+        """Poignée du coin : glisser dessus règle la taille du clavier."""
+        if self._mode != "keyboard":
+            return
+        inset = 7.0
+        right = self.width() - inset
+        bottom = self.height() - inset
+        painter.setPen(
+            QPen(
+                _with_alpha(self._palette.text, 0.45 if self._resizing else 0.30),
+                1.4,
+            )
+        )
+        for offset in (0.0, 4.0, 8.0):
+            painter.drawLine(
+                QPointF(right - offset, bottom), QPointF(right, bottom - offset)
+            )
 
     def resizeEvent(self, event) -> None:  # noqa: N802 - API Qt
         # Le redimensionnement du layout peut survenir après le calcul de la
@@ -328,8 +361,53 @@ class Overlay(QWidget):
         if self._anchoring_ready and not self._dragging:
             self._apply_anchor()
 
+    def _resize_to(self, cursor: QPoint) -> None:
+        """Règle la taille du clavier d'après le glisser de la poignée.
+
+        Le glisser se mesure depuis l'appui, dans la direction la plus
+        marquée : horizontalement ou verticalement, au choix.
+        """
+        width = max(1, self._resize_start_size.width())
+        height = max(1, self._resize_start_size.height())
+        dx = cursor.x() - self._resize_start.x()
+        dy = cursor.y() - self._resize_start.y()
+        if abs(dx) >= abs(dy):
+            ratio = (width + dx) / width
+        else:
+            ratio = (height + dy) / height
+        scale = min(
+            KEYBOARD_SCALE_MAX,
+            max(KEYBOARD_SCALE_MIN, self._resize_start_scale * ratio),
+        )
+        if abs(scale - self._cfg.keyboard_scale) < 0.005:
+            return
+        self._cfg.keyboard_scale = round(scale, 3)
+        self._visual.set_scale(self._cfg.keyboard_scale)
+        self._relayout()
+
+    def _grip_rect(self) -> QRect:
+        """Zone de la poignée, dans le coin bas droit de la bulle."""
+        return QRect(
+            self.width() - RESIZE_GRIP_SIZE,
+            self.height() - RESIZE_GRIP_SIZE,
+            RESIZE_GRIP_SIZE,
+            RESIZE_GRIP_SIZE,
+        )
+
     def mousePressEvent(self, event) -> None:  # noqa: N802 - API Qt
         if event.button() == Qt.MouseButton.LeftButton:
+            if self._mode == "keyboard" and self._grip_rect().contains(
+                event.position().toPoint()
+            ):
+                self._resizing = True
+                self._resize_start = event.globalPosition().toPoint()
+                self._resize_start_scale = self._cfg.keyboard_scale
+                self._resize_start_size = self.size()
+                self._hold_visible()
+                self.setCursor(Qt.CursorShape.SizeFDiagCursor)
+                self.update()
+                event.accept()
+                return
             self._drag_origin = (
                 event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             )
@@ -342,6 +420,10 @@ class Overlay(QWidget):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event) -> None:  # noqa: N802 - API Qt
+        if self._resizing and event.buttons() & Qt.MouseButton.LeftButton:
+            self._resize_to(event.globalPosition().toPoint())
+            event.accept()
+            return
         if self._dragging and event.buttons() & Qt.MouseButton.LeftButton:
             self.move(event.globalPosition().toPoint() - self._drag_origin)
             event.accept()
@@ -349,6 +431,16 @@ class Overlay(QWidget):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event) -> None:  # noqa: N802 - API Qt
+        if self._resizing and event.button() == Qt.MouseButton.LeftButton:
+            self._resizing = False
+            self.setCursor(Qt.CursorShape.OpenHandCursor)
+            self.update()
+            self._relayout()
+            # La taille choisie est conservée au prochain lancement.
+            self._cfg.remember_keyboard_scale(self._cfg.keyboard_scale)
+            self._bump()
+            event.accept()
+            return
         if self._dragging and event.button() == Qt.MouseButton.LeftButton:
             self._dragging = False
             self.setCursor(Qt.CursorShape.OpenHandCursor)

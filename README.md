@@ -236,8 +236,13 @@ réagissent, ce qui met le geste en avant pour une démonstration ou un tutoriel
 - La souris se masque sans changer de mode : décochez **Afficher la souris à
   côté du clavier** dans la fenêtre de personnalisation, ou mettez
   `"show_mouse": false`. Le clavier reste alors seul dans la bulle.
+- **Taille réglable à la souris** : la petite poignée en bas à droite de la
+  bulle redimensionne le clavier et sa souris de 60 % à 200 %. Glissez vers
+  l'intérieur pour réduire, vers l'extérieur pour agrandir ; la taille est
+  mémorisée dans `keyboard_scale` pour le prochain lancement.
 - La taille du clavier et de la souris suit la police et sa « Taille » :
-  augmentez `font_size` pour une vue plus grande à l'écran.
+  augmentez `font_size` pour une vue plus grande à l'écran, et utilisez la
+  poignée ci-dessous pour l'ajuster sans toucher aux réglages.
 - Le **mode masqué** (`Ctrl + F10`) n'allume aucune touche de caractère : les
   frappes sensibles ne sont pas révélées, contrairement aux modificateurs et
   aux clics de souris.
@@ -355,6 +360,7 @@ Le dossier qui contient le fichier doit donc être accessible en écriture.
   "display_mode": "overlay",
   "keyboard_layout": "azerty",
   "show_mouse": true,
+  "keyboard_scale": 1.0,
   "language": "auto",
   "concat_text": false,
   "typing_join_delay": 1.1,
@@ -421,6 +427,7 @@ Le dossier qui contient le fichier doit donc être accessible en écriture.
 | `display_mode` | `overlay` (pastilles de frappes) ou `keyboard` (clavier compact dont les touches s'allument). |
 | `keyboard_layout` | `azerty` ou `qwerty`, utilisé en mode `keyboard`. |
 | `show_mouse` | Afficher la souris à côté du clavier en mode `keyboard` (défaut `true`). |
+| `keyboard_scale` | Taille du clavier et de la souris, de `0.6` à `2.0` (défaut `1.0`), réglée avec la poignée de la bulle. |
 | `free_position` | Position libre enregistrée après un glisser, sous la forme `[x, y, largeur, hauteur]`. `null` = aucun déplacement manuel mémorisé. |
 | `language` | Langue de l'interface : `auto` (défaut, locale du système), `fr` ou `en`. |
 | `concat_text` | `false` (défaut) : une pastille par touche. `true` : les caractères s'ajoutent dans une ligne de texte. |

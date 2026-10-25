@@ -25,6 +25,10 @@ APPEARANCE_COLOR_FIELDS: tuple[str, ...] = (
     "accent_color",
 )
 
+#: Bornes de la taille du clavier réglée à la souris (poignée de la bulle).
+KEYBOARD_SCALE_MIN = 0.6
+KEYBOARD_SCALE_MAX = 2.0
+
 #: Réglages enregistrés par la fenêtre de personnalisation.
 APPEARANCE_CONFIG_KEYS: tuple[str, ...] = (
     *APPEARANCE_COLOR_FIELDS,
@@ -67,6 +71,7 @@ class Config:
     display_mode: str = "overlay"      # overlay (pastilles) | keyboard (clavier complet)
     keyboard_layout: str = "azerty"    # azerty | qwerty
     show_mouse: bool = True            # souris à côté du clavier (mode keyboard)
+    keyboard_scale: float = 1.0        # taille du clavier, réglée à la souris
     #: Position libre mémorisée : (x, y, largeur, hauteur).
     free_position: Optional[tuple[int, int, int, int]] = None
     language: str = LANGUAGE_AUTO       # auto (système) | fr | en
@@ -192,6 +197,7 @@ class Config:
         number("corner_radius", 0, 40, int, " px")
         number("margin", 0, 400, int, " px")
         number("typing_join_delay", 0.2, 10.0, float, " s")
+        number("keyboard_scale", KEYBOARD_SCALE_MIN, KEYBOARD_SCALE_MAX, float)
 
         for name in APPEARANCE_COLOR_FIELDS:
             value = getattr(self, name)
@@ -318,6 +324,15 @@ class Config:
         self.free_position = None
         return self._update_config(
             {"position": position, "free_position": None}, _t("Position")
+        )
+
+    # ------------------------------------------------------------------
+    def remember_keyboard_scale(self, scale: float) -> bool:
+        """Mémorise la taille du clavier réglée avec la poignée."""
+        value = min(KEYBOARD_SCALE_MAX, max(KEYBOARD_SCALE_MIN, float(scale)))
+        self.keyboard_scale = round(value, 3)
+        return self._update_config(
+            {"keyboard_scale": self.keyboard_scale}, _t("Taille du clavier")
         )
 
     # ------------------------------------------------------------------

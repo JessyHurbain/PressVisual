@@ -42,6 +42,8 @@ from .cli import (
 from .config import (
     APPEARANCE_COLOR_FIELDS,
     APPEARANCE_CONFIG_KEYS,
+    KEYBOARD_SCALE_MAX,
+    KEYBOARD_SCALE_MIN,
     Config,
     _as_bool,
     _color_to_text,
@@ -88,6 +90,7 @@ from .keymap import (
 from .mouse import MOUSE_BUTTONS, MOUSE_SCROLL_FLASH_MS, MouseView
 from .overlay import (
     KEYBOARD_MAX_LIT,
+    RESIZE_GRIP_SIZE,
     MAX_TEXT_LENGTH,
     SCROLL_AGGREGATE_WINDOW,
     Overlay,
@@ -112,6 +115,8 @@ __all__ = [
     "InputView",
     "KEYBOARD_MAX_LIT",
     "KEYBOARD_LAYOUTS",
+    "KEYBOARD_SCALE_MAX",
+    "KEYBOARD_SCALE_MIN",
     "LAYOUTS",
     "Key",
     "KeyEvent",
@@ -132,6 +137,7 @@ __all__ = [
     "NUMPAD_VK_CHARS",
     "Overlay",
     "POSITION_CHOICES",
+    "RESIZE_GRIP_SIZE",
     "POSITION_LABELS",
     "Palette",
     "PreviewPanel",

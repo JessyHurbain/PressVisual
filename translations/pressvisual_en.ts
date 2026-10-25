@@ -392,6 +392,10 @@
         <translation>Size</translation>
     </message>
     <message>
+        <source>Taille du clavier</source>
+        <translation>Keyboard size</translation>
+    </message>
+    <message>
         <source>Traduction introuvable ou illisible : {path}</source>
         <translation>Translation missing or unreadable: {path}</translation>
     </message>
