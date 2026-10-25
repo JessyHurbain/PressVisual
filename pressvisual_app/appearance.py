@@ -43,6 +43,7 @@ from .config import APPEARANCE_COLOR_FIELDS, Config, _color_to_text
 from .constants import APP_NAME
 from .i18n import LANGUAGE_AUTO, _t
 from .icon import build_app_icon
+from .keyboard import KeyboardView
 from .theme import Palette, _config_color
 from .widgets import KeyRow
 
@@ -142,7 +143,21 @@ class PreviewPanel(QWidget):
             row.set_items(items)
             self._layout.addWidget(row)
             self._rows.append(row)
+
+        keyboard_font = QFont(font)
+        keyboard_font.setPointSize(max(9, config.font_size - 4))
+        self._keyboard = KeyboardView(config, keyboard_font, self._palette, self)
+        self._layout.addWidget(self._keyboard)
+        self._apply_mode(config)
         self._sync_minimum_size()
+
+    # ------------------------------------------------------------------
+    def _apply_mode(self, config: Config) -> None:
+        """N'affiche que la vue correspondant au mode choisi."""
+        keyboard_mode = config.display_mode == "keyboard"
+        self._keyboard.setVisible(keyboard_mode)
+        for row in self._rows:
+            row.setVisible(not keyboard_mode)
 
     # ------------------------------------------------------------------
     def _sync_minimum_size(self) -> None:
@@ -162,6 +177,12 @@ class PreviewPanel(QWidget):
         font.setWeight(QFont.Weight.DemiBold)
         for row in self._rows:
             row.set_font(font)
+
+        keyboard_font = QFont(font_family)
+        keyboard_font.setPointSize(max(9, config.font_size - 4))
+        self._keyboard.set_config(config)
+        self._keyboard.set_font(keyboard_font)
+        self._apply_mode(config)
         self._sync_minimum_size()
         # Le QScrollArea réévalue la taille du widget après le layout : on
         # réapplique la taille minimale une fois celui-ci stabilisé.
@@ -308,6 +329,32 @@ class AppearanceDialog(QDialog):
         form.addRow(_t("Largeur maximale"), self.max_width)
         outer.addWidget(form_group)
 
+        display_group = QGroupBox(_t("Affichage"), self)
+        display_form = QFormLayout(display_group)
+        display_form.setHorizontalSpacing(14)
+        display_form.setVerticalSpacing(8)
+
+        self.mode_combo = QComboBox(display_group)
+        for value, label in (
+            ("overlay", _t("Overlay standard")),
+            ("keyboard", _t("Clavier complet")),
+        ):
+            self.mode_combo.addItem(label, value)
+        index = self.mode_combo.findData(str(config.display_mode).strip().lower())
+        self.mode_combo.setCurrentIndex(index if index >= 0 else 0)
+        display_form.addRow(_t("Mode d'affichage"), self.mode_combo)
+
+        self.layout_combo = QComboBox(display_group)
+        for value, label in (
+            ("azerty", _t("AZERTY (français)")),
+            ("qwerty", _t("QWERTY (anglais)")),
+        ):
+            self.layout_combo.addItem(label, value)
+        index = self.layout_combo.findData(str(config.keyboard_layout).strip().lower())
+        self.layout_combo.setCurrentIndex(index if index >= 0 else 0)
+        display_form.addRow(_t("Disposition du clavier"), self.layout_combo)
+        outer.addWidget(display_group)
+
         interface_group = QGroupBox(_t("Interface"), self)
         interface_form = QFormLayout(interface_group)
         interface_form.setHorizontalSpacing(14)
@@ -364,6 +411,8 @@ class AppearanceDialog(QDialog):
         self.corner_radius.valueChanged.connect(self._refresh_preview)
         self.margin.valueChanged.connect(self._refresh_preview)
         self.max_width.valueChanged.connect(self._refresh_preview)
+        self.mode_combo.currentIndexChanged.connect(self._refresh_preview)
+        self.layout_combo.currentIndexChanged.connect(self._refresh_preview)
 
         self._refresh_preview()
         self.adjustSize()
@@ -384,6 +433,8 @@ class AppearanceDialog(QDialog):
             family = self._base_config.font_family
         payload: dict[str, object] = {
             "language": self.language_combo.currentData() or LANGUAGE_AUTO,
+            "display_mode": self.mode_combo.currentData() or "overlay",
+            "keyboard_layout": self.layout_combo.currentData() or "azerty",
             "opacity": self.opacity_slider.value() / 100.0,
             "font_family": family,
             "font_size": self.font_size.value(),
@@ -424,6 +475,10 @@ class AppearanceDialog(QDialog):
             self.max_width.setValue(defaults.max_width)
             index = self.language_combo.findData(defaults.language)
             self.language_combo.setCurrentIndex(index if index >= 0 else 0)
+            index = self.mode_combo.findData(defaults.display_mode)
+            self.mode_combo.setCurrentIndex(index if index >= 0 else 0)
+            index = self.layout_combo.findData(defaults.keyboard_layout)
+            self.layout_combo.setCurrentIndex(index if index >= 0 else 0)
         finally:
             self._updating = False
         self._refresh_preview()

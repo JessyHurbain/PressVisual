@@ -26,6 +26,12 @@ POSITION_LABELS: dict[str, str] = {
     "bottom-center": "Bas centre",
 }
 
+#: Modes d'affichage : pastilles de frappes ou clavier complet.
+DISPLAY_MODES: tuple[str, ...] = ("overlay", "keyboard")
+
+#: Dispositions de clavier proposées pour le mode « clavier complet ».
+KEYBOARD_LAYOUTS: tuple[str, ...] = ("azerty", "qwerty")
+
 #: Ordre d'affichage des modificateurs dans une combinaison.
 MODIFIER_ORDER: tuple[str, ...] = ("ctrl", "alt", "shift", "win")
 

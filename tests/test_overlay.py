@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 
 import pytest
@@ -463,6 +464,98 @@ def test_release_restarts_the_hide_timer(overlay):
     assert overlay._idle_timer.isActive()
     assert overlay.isVisible()
     assert overlay.frameGeometry().center() != end, "la bulle doit avoir bougé"
+
+
+def test_drag_remembers_the_free_position(qapp, tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text("{}", encoding="utf-8")
+    config = pressvisual.Config.load(path, lambda _message: None)
+    config.validate()
+    widget = pressvisual.Overlay(config)
+    try:
+        widget.show()
+        _drag(widget, QPoint(-150, -120))
+
+        data = json.loads(path.read_text(encoding="utf-8"))
+        expected = [widget.x(), widget.y(), widget.width(), widget.height()]
+        assert data["free_position"] == expected
+        reloaded = pressvisual.Config.load(path, lambda _message: None)
+        assert reloaded.validate() == []
+        assert reloaded.free_position == tuple(expected)
+    finally:
+        widget._hide_now()
+        widget.hide()
+        widget.deleteLater()
+        qapp.processEvents()
+
+
+def test_free_position_is_restored_at_startup(qapp):
+    available = QGuiApplication.primaryScreen().availableGeometry()
+    config = pressvisual.Config(
+        free_position=(available.left() + 40, available.top() + 60, 300, 80)
+    )
+    assert config.validate() == []
+
+    widget = pressvisual.Overlay(config)
+    try:
+        assert widget.pos() == QPoint(available.left() + 40, available.top() + 60)
+        assert widget.size().width() == 300
+        assert widget.size().height() == 80
+        assert widget.position_name == ""
+
+        widget._on_key(KeyEvent(token="a", char="a"))
+        widget._relayout()
+
+        assert widget.x() >= available.left()
+        assert widget.y() >= available.top()
+        assert widget.frameGeometry().right() <= available.right()
+        assert widget.frameGeometry().bottom() <= available.bottom()
+    finally:
+        widget._hide_now()
+        widget.hide()
+        widget.deleteLater()
+        qapp.processEvents()
+
+
+def test_saved_position_outside_the_screen_is_clamped(qapp):
+    available = QGuiApplication.primaryScreen().availableGeometry()
+    config = pressvisual.Config(
+        free_position=(available.left() - 5000, available.top() - 5000, 300, 80)
+    )
+    assert config.validate() == []
+
+    widget = pressvisual.Overlay(config)
+    try:
+        assert widget.x() >= available.left()
+        assert widget.y() >= available.top()
+    finally:
+        widget._hide_now()
+        widget.hide()
+        widget.deleteLater()
+        qapp.processEvents()
+
+
+def test_choosing_a_preset_clears_the_saved_free_position(qapp, tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps({"free_position": [40, 60, 300, 80], "position": "bottom-right"}),
+        encoding="utf-8",
+    )
+    config = pressvisual.Config.load(path, lambda _message: None)
+    config.validate()
+    widget = pressvisual.Overlay(config)
+    try:
+        widget.set_position("top-left", announce=False)
+
+        data = json.loads(path.read_text(encoding="utf-8"))
+        assert data["free_position"] is None
+        assert data["position"] == "top-left"
+        assert widget.position_name == "top-left"
+    finally:
+        widget._hide_now()
+        widget.hide()
+        widget.deleteLater()
+        qapp.processEvents()
 
 
 def test_drag_outside_the_screen_is_clamped_back_inside(overlay):

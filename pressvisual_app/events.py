@@ -49,6 +49,7 @@ class InputBridge(QObject):
     """
 
     key_event = pyqtSignal(object)        # KeyEvent
+    key_release = pyqtSignal(str)         # jeton de la touche relâchée
     mouse_event = pyqtSignal(object)      # MouseEvent
     modifiers_changed = pyqtSignal(object)  # tuple[str, ...]
     hotkey = pyqtSignal(str)              # "toggle" | "masking" | ...

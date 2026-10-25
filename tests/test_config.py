@@ -179,6 +179,73 @@ def test_validate_falls_back_on_unknown_position():
     assert any("position" in note for note in notes)
 
 
+def test_validate_accepts_a_free_position():
+    config = pressvisual.Config(free_position=[240, 180, 320, 64])
+
+    notes = config.validate()
+
+    assert config.free_position == (240, 180, 320, 64)
+    assert notes == []
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "240,180",
+        [240, 180],
+        [240, 180, 320],
+        [240, 180, 320, 64, 12],
+        [240, 180, 0, 64],
+        [240, 180, 320, -4],
+        [True, 180, 320, 64],
+        [240, "180", 320, 64],
+        {"x": 240, "y": 180},
+    ],
+)
+def test_validate_resets_an_invalid_free_position(value):
+    config = pressvisual.Config(free_position=value)
+
+    notes = config.validate()
+
+    assert config.free_position is None
+    assert any("free_position" in note for note in notes)
+
+
+def test_default_display_settings():
+    config = pressvisual.Config()
+
+    assert config.display_mode == "overlay"
+    assert config.keyboard_layout == "azerty"
+
+
+def test_validate_normalises_display_settings():
+    config = pressvisual.Config(display_mode=" KEYBOARD ", keyboard_layout="QWERTY")
+
+    notes = config.validate()
+
+    assert config.display_mode == "keyboard"
+    assert config.keyboard_layout == "qwerty"
+    assert notes == []
+
+
+def test_validate_falls_back_on_unknown_display_mode():
+    config = pressvisual.Config(display_mode="fenêtre")
+
+    notes = config.validate()
+
+    assert config.display_mode == "overlay"
+    assert any("display_mode" in note for note in notes)
+
+
+def test_validate_falls_back_on_unknown_keyboard_layout():
+    config = pressvisual.Config(keyboard_layout="dvorak")
+
+    notes = config.validate()
+
+    assert config.keyboard_layout == "azerty"
+    assert any("keyboard_layout" in note for note in notes)
+
+
 def test_validate_trims_text_settings():
     config = pressvisual.Config(font_family="  Inter  ", hotkey_toggle=" ctrl+f12 ")
 
@@ -215,11 +282,53 @@ def test_remember_position_rejects_unknown_value(tmp_path):
     assert json.loads(path.read_text(encoding="utf-8"))["position"] == "bottom-right"
 
 
+def test_remember_free_position_preserves_unrelated_keys(tmp_path):
+    path = tmp_path / "config.json"
+    write_json(path, {"display_duration": 5.0, "position": "top-left"})
+    config = pressvisual.Config.load(path, lambda _message: None)
+
+    assert config.remember_free_position(310, 205, 280, 96) is True
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["free_position"] == [310, 205, 280, 96]
+    assert data["position"] == "top-left"
+    assert data["display_duration"] == 5.0
+    assert config.free_position == (310, 205, 280, 96)
+
+
+def test_remember_position_clears_the_free_position(tmp_path):
+    path = tmp_path / "config.json"
+    write_json(path, {"free_position": [310, 205, 280, 96]})
+    config = pressvisual.Config.load(path, lambda _message: None)
+
+    assert config.remember_position("bottom-center") is True
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["free_position"] is None
+    assert data["position"] == "bottom-center"
+    assert config.free_position is None
+
+
 def test_remember_position_without_file_writes_nothing():
     config = pressvisual.Config()
     assert config.path is None
 
     assert config.remember_position("top-right") is True
+
+
+def test_save_appearance_keeps_display_settings(tmp_path):
+    path = tmp_path / "config.json"
+    write_json(path, {"position": "top-left"})
+    config = pressvisual.Config.load(path, lambda _message: None)
+
+    assert config.save_appearance(
+        {"display_mode": "keyboard", "keyboard_layout": "qwerty"}
+    )
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["display_mode"] == "keyboard"
+    assert data["keyboard_layout"] == "qwerty"
+    assert data["position"] == "top-left"
 
 
 def test_save_appearance_round_trip(tmp_path):

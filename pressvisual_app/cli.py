@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import os
 import signal
 import sys
+import tempfile
 from pathlib import Path
 from typing import Iterable, Optional
 
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QLockFile, QStandardPaths, QTimer
 from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
 from .capture import InputListener
@@ -137,6 +139,64 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def apply_arguments(config: Config, args: argparse.Namespace) -> None:
+    """Applique les options de la ligne de commande à la configuration.
+
+    Les options explicites l'emportent sur le fichier ; en particulier
+    ``--position`` remplace une position libre mémorisée par un glisser.
+    """
+    if args.duration is not None:
+        config.display_duration = args.duration
+    if args.opacity is not None:
+        config.opacity = args.opacity
+    if args.font_size is not None:
+        config.font_size = args.font_size
+    if args.max_rows is not None:
+        config.max_rows = args.max_rows
+    if args.max_width is not None:
+        config.max_width = args.max_width
+    if args.margin is not None:
+        config.margin = args.margin
+    if args.position is not None:
+        config.position = args.position
+        config.free_position = None
+    if args.no_keyboard:
+        config.capture_keyboard = False
+    if args.no_mouse:
+        config.capture_mouse = False
+    if args.group_text:
+        config.concat_text = True
+    if args.start_hidden:
+        config.start_hidden = True
+    if args.click_through:
+        config.click_through_on_start = True
+    if args.toggle_hotkey is not None:
+        config.hotkey_toggle = args.toggle_hotkey
+    if args.lang is not None:
+        config.language = args.lang
+
+
+def _instance_lock_path() -> Path:
+    """Fichier de verrou empêchant deux instances de capturer le clavier."""
+    base = QStandardPaths.writableLocation(
+        QStandardPaths.StandardLocation.TempLocation
+    )
+    directory = Path(base) if base else Path(tempfile.gettempdir())
+    user = os.getuid() if hasattr(os, "getuid") else os.environ.get("USERNAME", "user")
+    return directory / f"pressvisual-{user}.lock"
+
+
+def acquire_instance_lock() -> Optional[QLockFile]:
+    """Prend le verrou mono-instance, ou renvoie ``None`` s'il est déjà pris.
+
+    Deux instances écouteraient le même clavier et afficheraient deux fois
+    chaque frappe : le verrou n'admet qu'un seul PressVisual par utilisateur.
+    Un verrou laissé par un processus disparu est récupéré par Qt.
+    """
+    lock = QLockFile(str(_instance_lock_path()))
+    return lock if lock.tryLock(0) else None
+
+
 # ---------------------------------------------------------------------------
 # Point d'entrée
 # ---------------------------------------------------------------------------
@@ -167,6 +227,20 @@ def main(argv: Optional[list[str]] = None) -> int:
     def warn(message: str) -> None:
         sys.stderr.write(f"[{APP_NAME}] {message}\n")
 
+    # Une seule instance peut écouter le clavier à la fois.
+    instance_lock = acquire_instance_lock()
+    if instance_lock is None:
+        message = _t(
+            "PressVisual est déjà lancé : une seule instance peut capturer "
+            "le clavier."
+        )
+        if sys.stderr is not None:
+            warn(message)
+        else:
+            # Exécutable sans console : le message doit rester visible.
+            QMessageBox.information(None, APP_NAME, message)
+        return 1
+
     config_path = (
         Path(args.config).expanduser().resolve()
         if args.config
@@ -174,34 +248,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
     config = Config.load(config_path, warn)
 
-    if args.duration is not None:
-        config.display_duration = args.duration
-    if args.opacity is not None:
-        config.opacity = args.opacity
-    if args.font_size is not None:
-        config.font_size = args.font_size
-    if args.max_rows is not None:
-        config.max_rows = args.max_rows
-    if args.max_width is not None:
-        config.max_width = args.max_width
-    if args.margin is not None:
-        config.margin = args.margin
-    if args.position is not None:
-        config.position = args.position
-    if args.no_keyboard:
-        config.capture_keyboard = False
-    if args.no_mouse:
-        config.capture_mouse = False
-    if args.group_text:
-        config.concat_text = True
-    if args.start_hidden:
-        config.start_hidden = True
-    if args.click_through:
-        config.click_through_on_start = True
-    if args.toggle_hotkey is not None:
-        config.hotkey_toggle = args.toggle_hotkey
-    if args.lang is not None:
-        config.language = args.lang
+    apply_arguments(config, args)
 
     # Le fichier de configuration peut imposer une autre langue que --lang.
     wanted = resolve_language(config.language)
@@ -251,6 +298,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             overlay.toggle_masking()
 
     bridge.key_event.connect(overlay._on_key)
+    bridge.key_release.connect(overlay._on_key_release)
     bridge.mouse_event.connect(overlay._on_mouse)
     bridge.modifiers_changed.connect(overlay._on_modifiers)
     bridge.hotkey.connect(dispatch_hotkey)

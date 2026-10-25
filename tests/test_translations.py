@@ -165,6 +165,24 @@ def test_appearance_dialog_is_translated(english, qapp, config):
         dialog.deleteLater()
 
 
+def test_display_settings_are_translated(english, qapp, config):
+    dialog = pressvisual.AppearanceDialog(config, "DejaVu Sans")
+    try:
+        labels = [
+            dialog.mode_combo.itemText(index)
+            for index in range(dialog.mode_combo.count())
+        ]
+        layouts = [
+            dialog.layout_combo.itemText(index)
+            for index in range(dialog.layout_combo.count())
+        ]
+
+        assert labels == ["Standard overlay", "Full keyboard"]
+        assert layouts == ["AZERTY (French)", "QWERTY (English)"]
+    finally:
+        dialog.deleteLater()
+
+
 def test_tray_menu_is_translated(english, qapp, overlay, config):
     tray = pressvisual.TrayController(qapp, overlay, config)
     try:

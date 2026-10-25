@@ -34,6 +34,7 @@ from .config import APPEARANCE_CONFIG_KEYS, Config
 from .constants import APP_NAME
 from .events import KeyEvent, MouseEvent
 from .i18n import _t
+from .keyboard import KeyboardView
 from .keymap import (
     MODIFIER_ORDER,
     MULTI_CLICK_LABELS,
@@ -50,6 +51,8 @@ from .widgets import KeyRow
 MAX_TEXT_LENGTH = 200
 #: Fenêtre de temps (s) d'agrégation des événements de molette.
 SCROLL_AGGREGATE_WINDOW = 0.9
+#: Nombre maximal de touches allumées simultanément (sécurité anti-blocage).
+KEYBOARD_MAX_LIT = 16
 
 class Overlay(QWidget):
     """Fenêtre flottante affichant les frappes et les clics."""
@@ -97,6 +100,9 @@ class Overlay(QWidget):
         self._capture_enabled = not config.start_hidden
         self._click_through = False
         self._masked = False
+        self._mode = "keyboard" if config.display_mode == "keyboard" else "overlay"
+        self._kb_active: set[str] = set()
+        self._kb_modifiers: set[str] = set()
         self._dragging = False
         self._drag_origin = QPoint(0, 0)
         self._fade_target = "idle"
@@ -120,9 +126,20 @@ class Overlay(QWidget):
         self._typing_timer.setSingleShot(True)
         self._typing_timer.timeout.connect(self._finish_text)
 
+        # Vue « clavier complet » : seule la disposition choisie est dessinée.
+        self._keyboard = KeyboardView(
+            self._cfg, self._badge_font, self._palette, self
+        )
+        if self._mode == "keyboard":
+            self._layout.addWidget(self._keyboard)
+            self._keyboard.show()
+        else:
+            self._keyboard.hide()
+
         self._anchoring_ready = False
         self.resize(320, 64)
-        self._reset_anchor_position(config.position)
+        if not self._restore_free_position():
+            self._reset_anchor_position(config.position)
         self._anchoring_ready = True
         self.setWindowOpacity(0.0)
         self.hide()
@@ -169,6 +186,10 @@ class Overlay(QWidget):
         self._text_font.setWeight(QFont.Weight.Medium)
         self._text_metrics = QFontMetrics(self._text_font)
 
+        keyboard = getattr(self, "_keyboard", None)
+        if keyboard is not None:
+            keyboard.set_font(self._badge_font)
+
     def apply_appearance(self, values: dict[str, object]) -> None:
         """Applique de nouveaux réglages d'apparence à l'overlay."""
         for key, value in values.items():
@@ -182,6 +203,7 @@ class Overlay(QWidget):
             row.set_font(self._badge_font)
         if self._text_row is not None:
             self._render_text()
+        self._apply_display_mode()
 
         # Une marge différente doit replacer un coin préréglé ; un
         # déplacement libre conserve sa position.
@@ -192,6 +214,59 @@ class Overlay(QWidget):
             self._reset_anchor_position(self._position_name, screen)
         self._relayout()
         self.update()
+
+    # ------------------------------------------------------------------
+    # Mode d'affichage
+    # ------------------------------------------------------------------
+    def _apply_display_mode(self) -> None:
+        """Bascule entre les pastilles et le clavier complet."""
+        mode = "keyboard" if self._cfg.display_mode == "keyboard" else "overlay"
+        self._keyboard.refresh_layout()
+        self._keyboard.set_font(self._badge_font)
+        self._keyboard.set_masked(self._masked)
+
+        if mode == self._mode:
+            self._relayout()
+            return
+
+        self._mode = mode
+        self._clear_rows()
+        self._clear_keyboard()
+        if mode == "keyboard":
+            self._layout.addWidget(self._keyboard)
+            self._keyboard.show()
+        else:
+            self._layout.removeWidget(self._keyboard)
+            self._keyboard.hide()
+        self._relayout()
+
+    def _press_key(self, event: KeyEvent) -> None:
+        """Allume la touche pressée ; elle s'éteint au relâchement."""
+        self._kb_active.add(event.token)
+        # Une relâche manquée (changement de fenêtre, raccourci système) ne
+        # doit pas laisser le clavier éclairé indéfiniment.
+        if len(self._kb_active) > KEYBOARD_MAX_LIT:
+            self._kb_active = {event.token}
+        self._apply_keyboard_state()
+        self._bump()
+
+    def _on_key_release(self, token: str) -> None:
+        """Éteint la touche dès qu'elle est relâchée."""
+        if self._mode != "keyboard":
+            return
+        if token in self._kb_active:
+            self._kb_active.discard(token)
+            self._apply_keyboard_state()
+
+    def _clear_keyboard(self) -> None:
+        """Éteint toutes les touches du clavier."""
+        self._kb_active.clear()
+        self._apply_keyboard_state()
+
+    def _apply_keyboard_state(self) -> None:
+        self._keyboard.set_masked(self._masked)
+        self._keyboard.set_modifiers(self._kb_modifiers)
+        self._keyboard.set_active(self._kb_active)
 
     # ------------------------------------------------------------------
     # Peinture et déplacement
@@ -261,6 +336,10 @@ class Overlay(QWidget):
             self.update()
             # Rattrape un éventuel changement de contenu pendant le glisser.
             self._relayout()
+            # Mémorise la position choisie pour le prochain lancement.
+            self._cfg.remember_free_position(
+                self.x(), self.y(), self.width(), self.height()
+            )
             # La bulle reste affichée un délai complet après avoir été posée.
             self._bump()
             event.accept()
@@ -279,6 +358,22 @@ class Overlay(QWidget):
         self._fade.stop()
         self._fade_target = "idle"
         self.setWindowOpacity(1.0)
+
+    def _restore_free_position(self) -> bool:
+        """Replace la bulle à la position libre mémorisée, si elle existe."""
+        if self._cfg.free_position is None:
+            return False
+        x, y, width, height = self._cfg.free_position
+        screen = QGuiApplication.screenAt(QPoint(x, y)) or QGuiApplication.primaryScreen()
+        if screen is not None:
+            available = screen.availableGeometry()
+            width = min(width, available.width())
+            height = min(height, available.height())
+        self.setGeometry(int(x), int(y), int(width), int(height))
+        self._snap_anchor_to_position()
+        # Ramène la bulle dans la zone visible si l'écran a changé depuis.
+        self._apply_anchor()
+        return True
 
     def _snap_anchor_to_position(self) -> None:
         """Conserve les bords proches du centre de l'écran après un glisser.
@@ -464,6 +559,7 @@ class Overlay(QWidget):
         self.hide()
         self.setWindowOpacity(1.0)
         self._clear_rows()
+        self._clear_keyboard()
 
     def _hide_now(self) -> None:
         self._fade.stop()
@@ -653,6 +749,13 @@ class Overlay(QWidget):
             return
         snapshot = tuple(m for m in MODIFIER_ORDER if m in set(mods))
 
+        if self._mode == "keyboard":
+            self._kb_modifiers = set(snapshot)
+            self._apply_keyboard_state()
+            if snapshot:
+                self._bump()
+            return
+
         if self._combo_row is not None:
             if not snapshot:
                 # Modificateurs relâchés sans touche : la ligne reste affichée.
@@ -678,6 +781,10 @@ class Overlay(QWidget):
     def _on_key(self, event: KeyEvent) -> None:
         if not self._capture_enabled:
             return
+        if self._mode == "keyboard":
+            self._press_key(event)
+            return
+
         mods = tuple(m for m in MODIFIER_ORDER if m in set(event.mods))
         plain = not ({"ctrl", "alt", "win"} & set(mods))
 
@@ -748,6 +855,10 @@ class Overlay(QWidget):
     # ------------------------------------------------------------------
     def _on_mouse(self, event: MouseEvent) -> None:
         if not self._capture_enabled or not self._cfg.capture_mouse:
+            return
+
+        # Le mode clavier n'affiche que les touches : la souris est ignorée.
+        if self._mode == "keyboard":
             return
 
         if self._cfg.ignore_overlay_clicks and not self._click_through and self.isVisible():
@@ -866,6 +977,9 @@ class Overlay(QWidget):
         # resteraient invisibles puis réapparaîtraient à la réactivation.
         if not self._capture_enabled:
             return
+        # Le mode clavier n'affiche pas de ligne de texte.
+        if self._mode == "keyboard":
+            return
         self._flush_typing()
         self._close_combo(remove=True)
         self._scroll_row = None
@@ -883,6 +997,7 @@ class Overlay(QWidget):
         else:
             self._hide_now()
             self._clear_rows()
+            self._clear_keyboard()
         self.state_changed.emit()
 
     def toggle_visible(self) -> None:
@@ -925,6 +1040,7 @@ class Overlay(QWidget):
         """Active/désactive le masquage des caractères saisis."""
         self._masked = not self._masked
         self._clear_rows()
+        self._keyboard.set_masked(self._masked)
         self._status(
             _t("Masquage des frappes : activé")
             if self._masked

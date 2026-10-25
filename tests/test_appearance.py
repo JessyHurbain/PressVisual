@@ -151,6 +151,102 @@ def test_dialog_preview_paints_without_error(qapp, config):
         dialog.deleteLater()
 
 
+def test_dialog_exposes_display_mode_choices(qapp, config):
+    dialog = make_dialog(qapp, config)
+    try:
+        assert dialog.mode_combo.count() == 2
+        assert dialog.mode_combo.currentData() == "overlay"
+        assert dialog.mode_combo.findData("keyboard") >= 0
+        assert dialog.layout_combo.count() == 2
+        assert dialog.layout_combo.currentData() == "azerty"
+        assert dialog.layout_combo.findData("qwerty") >= 0
+    finally:
+        dialog.deleteLater()
+
+
+def test_dialog_reflects_configured_display_settings(qapp, config):
+    config.display_mode = "keyboard"
+    config.keyboard_layout = "qwerty"
+
+    dialog = make_dialog(qapp, config)
+
+    try:
+        assert dialog.mode_combo.currentData() == "keyboard"
+        assert dialog.layout_combo.currentData() == "qwerty"
+    finally:
+        dialog.deleteLater()
+
+
+def test_dialog_values_include_display_settings(qapp, config):
+    dialog = make_dialog(qapp, config)
+    try:
+        dialog.mode_combo.setCurrentIndex(dialog.mode_combo.findData("keyboard"))
+        dialog.layout_combo.setCurrentIndex(dialog.layout_combo.findData("qwerty"))
+
+        values = dialog.values()
+
+        assert values["display_mode"] == "keyboard"
+        assert values["keyboard_layout"] == "qwerty"
+    finally:
+        dialog.deleteLater()
+
+
+def test_dialog_reset_restores_the_standard_overlay(qapp, config):
+    config.display_mode = "keyboard"
+    config.keyboard_layout = "qwerty"
+    dialog = make_dialog(qapp, config)
+    try:
+        dialog._reset()
+
+        assert dialog.mode_combo.currentData() == "overlay"
+        assert dialog.layout_combo.currentData() == "azerty"
+    finally:
+        dialog.deleteLater()
+
+
+def test_preview_switches_to_the_keyboard(qapp, config):
+    dialog = make_dialog(qapp, config)
+    try:
+        assert dialog.preview._keyboard.isHidden() is True
+        assert not any(row.isHidden() for row in dialog.preview._rows)
+
+        dialog.mode_combo.setCurrentIndex(dialog.mode_combo.findData("keyboard"))
+
+        assert dialog.preview._keyboard.isHidden() is False
+        assert all(row.isHidden() for row in dialog.preview._rows)
+
+        dialog.mode_combo.setCurrentIndex(dialog.mode_combo.findData("overlay"))
+
+        assert dialog.preview._keyboard.isHidden() is True
+    finally:
+        dialog.deleteLater()
+
+
+def test_preview_keyboard_follows_the_chosen_layout(qapp, config):
+    dialog = make_dialog(qapp, config)
+    try:
+        dialog.mode_combo.setCurrentIndex(dialog.mode_combo.findData("keyboard"))
+        dialog.layout_combo.setCurrentIndex(dialog.layout_combo.findData("qwerty"))
+
+        assert dialog.preview._keyboard.layout.name == "qwerty"
+    finally:
+        dialog.deleteLater()
+
+
+def test_preview_keyboard_paints(qapp, config):
+    dialog = make_dialog(qapp, config)
+    try:
+        dialog.mode_combo.setCurrentIndex(dialog.mode_combo.findData("keyboard"))
+        dialog.preview.resize(560, 240)
+        dialog.preview.update_appearance(dialog._preview_config(), "DejaVu Sans")
+
+        pixmap = dialog.preview.grab()
+
+        assert not pixmap.isNull()
+    finally:
+        dialog.deleteLater()
+
+
 def test_dialog_exposes_language_choice(qapp, config):
     dialog = make_dialog(qapp, config)
     try:

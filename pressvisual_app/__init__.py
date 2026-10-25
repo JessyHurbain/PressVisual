@@ -30,7 +30,15 @@ from .capture import (
     _classify_key,
     _is_altgr,
 )
-from .cli import _default_config_path, _language_argument, build_arg_parser, main
+from .cli import (
+    _default_config_path,
+    _instance_lock_path,
+    _language_argument,
+    acquire_instance_lock,
+    apply_arguments,
+    build_arg_parser,
+    main,
+)
 from .config import (
     APPEARANCE_COLOR_FIELDS,
     APPEARANCE_CONFIG_KEYS,
@@ -51,7 +59,18 @@ from .i18n import (
     translations_directory,
 )
 from .icon import build_app_icon
+from .keyboard import (
+    AZERTY,
+    LAYOUTS,
+    QWERTY,
+    KeyboardLayout,
+    KeyboardView,
+    Key,
+    layout_for,
+)
 from .keymap import (
+    DISPLAY_MODES,
+    KEYBOARD_LAYOUTS,
     MULTI_CLICK_LABELS,
     MODIFIER_ALIASES,
     MODIFIER_KEYS,
@@ -65,7 +84,12 @@ from .keymap import (
     parse_hotkey,
     should_use_combo,
 )
-from .overlay import MAX_TEXT_LENGTH, SCROLL_AGGREGATE_WINDOW, Overlay
+from .overlay import (
+    KEYBOARD_MAX_LIT,
+    MAX_TEXT_LENGTH,
+    SCROLL_AGGREGATE_WINDOW,
+    Overlay,
+)
 from .theme import Palette, _blend, _config_color, _luminance, _with_alpha
 from .tray import TrayController
 from .widgets import Badge, KeyRow
@@ -74,14 +98,22 @@ __all__ = [
     "APP_NAME",
     "APPEARANCE_COLOR_FIELDS",
     "APPEARANCE_CONFIG_KEYS",
+    "AZERTY",
     "AppearanceDialog",
     "Badge",
     "ColorButton",
     "Config",
+    "DISPLAY_MODES",
     "DOUBLE_CLICK_WINDOW",
     "InputBridge",
     "InputListener",
+    "KEYBOARD_MAX_LIT",
+    "KEYBOARD_LAYOUTS",
+    "LAYOUTS",
+    "Key",
     "KeyEvent",
+    "KeyboardLayout",
+    "KeyboardView",
     "KeyRow",
     "LANGUAGE_AUTO",
     "MAX_TEXT_LENGTH",
@@ -97,6 +129,7 @@ __all__ = [
     "POSITION_LABELS",
     "Palette",
     "PreviewPanel",
+    "QWERTY",
     "SCROLL_AGGREGATE_WINDOW",
     "SPECIAL_KEY_LABELS",
     "SUPPORTED_LANGUAGES",
@@ -109,17 +142,21 @@ __all__ = [
     "_color_to_text",
     "_config_color",
     "_default_config_path",
+    "_instance_lock_path",
     "_is_altgr",
     "_language_argument",
     "_luminance",
     "_t",
     "_with_alpha",
+    "acquire_instance_lock",
+    "apply_arguments",
     "apply_language_change",
     "build_app_icon",
     "build_arg_parser",
     "describe_hotkey",
     "install_translator",
     "key_label",
+    "layout_for",
     "main",
     "modifier_label",
     "parse_hotkey",

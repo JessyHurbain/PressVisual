@@ -243,6 +243,8 @@ class InputListener(threading.Thread):
                 return
             if token:
                 self._held.discard(token.lower())
+                # L'interface éteint la touche dès qu'elle est relâchée.
+                self._bridge.key_release.emit(token.lower())
         except Exception as exc:
             self._report_error(
                 _t("Erreur pendant la lecture du clavier : {error}").format(error=exc)

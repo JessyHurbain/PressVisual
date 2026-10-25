@@ -19,7 +19,9 @@ class Recorder:
         self.modifiers: list[tuple[str, ...]] = []
         self.hotkeys: list[str] = []
         self.errors: list[str] = []
+        self.releases: list[str] = []
         self.bridge.key_event.connect(self.keys.append)
+        self.bridge.key_release.connect(self.releases.append)
         self.bridge.mouse_event.connect(self.mouse.append)
         self.bridge.modifiers_changed.connect(self.modifiers.append)
         self.bridge.hotkey.connect(self.hotkeys.append)
@@ -168,6 +170,40 @@ def test_click_carries_modifiers(recorder, config):
             mods=("ctrl",),
         )
     ]
+
+
+def test_release_emits_the_key_token(recorder, config):
+    listener = make_listener(recorder, config)
+
+    listener._on_press(keyboard.KeyCode.from_char("a"))
+    listener._on_release(keyboard.KeyCode.from_char("a"))
+
+    assert recorder.releases == ["a"]
+
+
+def test_release_is_emitted_for_special_keys(recorder, config):
+    listener = make_listener(recorder, config)
+
+    listener._on_release(keyboard.Key.enter)
+
+    assert recorder.releases == ["enter"]
+
+
+def test_modifier_release_does_not_emit_a_key_release(recorder, config):
+    listener = make_listener(recorder, config)
+
+    listener._on_press(keyboard.Key.ctrl)
+    listener._on_release(keyboard.Key.ctrl)
+
+    assert recorder.releases == []
+
+
+def test_unidentified_release_is_ignored(recorder, config):
+    listener = make_listener(recorder, config)
+
+    listener._on_release(keyboard.KeyCode(vk=0))
+
+    assert recorder.releases == []
 
 
 def test_click_release_is_ignored(recorder, config):

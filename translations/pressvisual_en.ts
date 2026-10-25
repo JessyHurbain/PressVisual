@@ -4,6 +4,14 @@
 <context>
     <name>PressVisual</name>
     <message>
+        <source>AZERTY (français)</source>
+        <translation>AZERTY (French)</translation>
+    </message>
+    <message>
+        <source>Affichage</source>
+        <translation>Display</translation>
+    </message>
+    <message>
         <source>Afficher l'overlay</source>
         <translation>Show overlay</translation>
     </message>
@@ -96,6 +104,10 @@
         <translation>Right click</translation>
     </message>
     <message>
+        <source>Clavier complet</source>
+        <translation>Full keyboard</translation>
+    </message>
+    <message>
         <source>Clic gauche</source>
         <translation>Left click</translation>
     </message>
@@ -146,6 +158,10 @@
     <message>
         <source>Ctrl</source>
         <translation>Ctrl</translation>
+    </message>
+    <message>
+        <source>Disposition du clavier</source>
+        <translation>Keyboard layout</translation>
     </message>
     <message>
         <source>Double clic</source>
@@ -244,6 +260,10 @@
         <translation>Menu</translation>
     </message>
     <message>
+        <source>Mode d'affichage</source>
+        <translation>Display mode</translation>
+    </message>
+    <message>
         <source>Mise en forme</source>
         <translation>Layout</translation>
     </message>
@@ -254,6 +274,10 @@
     <message>
         <source>Opacité</source>
         <translation>Opacity</translation>
+    </message>
+    <message>
+        <source>Overlay standard</source>
+        <translation>Standard overlay</translation>
     </message>
     <message>
         <source>Overlay de visualisation des frappes clavier et des clics souris, pour les captures d'écran et tutoriels.</source>
@@ -278,6 +302,14 @@
     <message>
         <source>Personnaliser l'overlay…</source>
         <translation>Customize overlay…</translation>
+    </message>
+    <message>
+        <source>PressVisual est déjà lancé : une seule instance peut capturer le clavier.</source>
+        <translation>PressVisual is already running: only one instance can capture the keyboard.</translation>
+    </message>
+    <message>
+        <source>QWERTY (anglais)</source>
+        <translation>QWERTY (English)</translation>
     </message>
     <message>
         <source>Police</source>
@@ -416,6 +448,10 @@
         <translation>start without capture (Ctrl+F12 to enable)</translation>
     </message>
     <message>
+        <source>display_mode inconnu ({value}) : « overlay » utilisé.</source>
+        <translation>Unknown display_mode ({value}): “overlay” used.</translation>
+    </message>
+    <message>
         <source>erreur de capture</source>
         <translation>capture error</translation>
     </message>
@@ -426,6 +462,14 @@
     <message>
         <source>filtered_keys doit être une liste : valeur ignorée.</source>
         <translation>filtered_keys must be a list: value ignored.</translation>
+    </message>
+    <message>
+        <source>free_position invalide ({value}) : position préréglée utilisée.</source>
+        <translation>Invalid free_position ({value}): preset position used.</translation>
+    </message>
+    <message>
+        <source>keyboard_layout inconnu ({value}) : « azerty » utilisé.</source>
+        <translation>Unknown keyboard_layout ({value}): “azerty” used.</translation>
     </message>
     <message>
         <source>langue de l'interface : auto (système), fr ou en</source>

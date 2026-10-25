@@ -13,7 +13,7 @@ from PyQt6.QtGui import QColor
 
 from .constants import APP_NAME
 from .i18n import LANGUAGE_AUTO, SUPPORTED_LANGUAGES, _t
-from .keymap import POSITION_CHOICES
+from .keymap import DISPLAY_MODES, KEYBOARD_LAYOUTS, POSITION_CHOICES
 
 #: Couleurs personnalisables de l'overlay (format ``#RRGGBB`` ou ``#AARRGGBB``).
 APPEARANCE_COLOR_FIELDS: tuple[str, ...] = (
@@ -35,6 +35,8 @@ APPEARANCE_CONFIG_KEYS: tuple[str, ...] = (
     "max_width",
     "corner_radius",
     "margin",
+    "display_mode",
+    "keyboard_layout",
 )
 # ---------------------------------------------------------------------------
 # Configuration
@@ -61,6 +63,10 @@ class Config:
     corner_radius: int = 16
     margin: int = 28                   # marge avec le bord de l'écran (px)
     position: str = "bottom-right"     # top-left | top-right | bottom-left | bottom-right | bottom-center
+    display_mode: str = "overlay"      # overlay (pastilles) | keyboard (clavier complet)
+    keyboard_layout: str = "azerty"    # azerty | qwerty
+    #: Position libre mémorisée : (x, y, largeur, hauteur).
+    free_position: Optional[tuple[int, int, int, int]] = None
     language: str = LANGUAGE_AUTO       # auto (système) | fr | en
     concat_text: bool = False           # True = regrouper le texte, False = touche par touche
     typing_join_delay: float = 1.1     # délai de concaténation du texte (s)
@@ -205,6 +211,48 @@ class Config:
             )
             self.position = "bottom-right"
 
+        free = self.free_position
+        if free is None:
+            pass
+        elif (
+            isinstance(free, (list, tuple))
+            and len(free) == 4
+            and all(
+                isinstance(value, int) and not isinstance(value, bool)
+                for value in free
+            )
+            and free[2] > 0
+            and free[3] > 0
+        ):
+            self.free_position = (free[0], free[1], free[2], free[3])
+        else:
+            notes.append(
+                _t(
+                    "free_position invalide ({value}) : position préréglée utilisée."
+                ).format(value=repr(free))
+            )
+            self.free_position = None
+
+        mode = str(self.display_mode or "overlay").strip().lower()
+        if mode not in DISPLAY_MODES:
+            notes.append(
+                _t("display_mode inconnu ({value}) : « overlay » utilisé.").format(
+                    value=repr(self.display_mode)
+                )
+            )
+            mode = "overlay"
+        self.display_mode = mode
+
+        layout = str(self.keyboard_layout or "azerty").strip().lower()
+        if layout not in KEYBOARD_LAYOUTS:
+            notes.append(
+                _t(
+                    "keyboard_layout inconnu ({value}) : « azerty » utilisé."
+                ).format(value=repr(self.keyboard_layout))
+            )
+            layout = "azerty"
+        self.keyboard_layout = layout
+
         self.language = str(self.language or LANGUAGE_AUTO).strip().lower()
         if self.language not in (LANGUAGE_AUTO, *SUPPORTED_LANGUAGES):
             notes.append(
@@ -258,10 +306,23 @@ class Config:
 
     # ------------------------------------------------------------------
     def remember_position(self, position: str) -> bool:
-        """Enregistre ``position`` dans le fichier JSON de configuration."""
+        """Enregistre ``position`` dans le fichier JSON de configuration.
+
+        Un coin préréglé remplace la position libre : celle-ci est effacée.
+        """
         if position not in POSITION_CHOICES:
             return False
-        return self._update_config({"position": position}, _t("Position"))
+        self.free_position = None
+        return self._update_config(
+            {"position": position, "free_position": None}, _t("Position")
+        )
+
+    # ------------------------------------------------------------------
+    def remember_free_position(self, x: int, y: int, width: int, height: int) -> bool:
+        """Mémorise la position et la taille libres dans le fichier JSON."""
+        values = (int(x), int(y), int(width), int(height))
+        self.free_position = values
+        return self._update_config({"free_position": list(values)}, _t("Position"))
 
     # ------------------------------------------------------------------
     def save_appearance(self, values: dict[str, object]) -> bool:
