@@ -109,6 +109,8 @@ poussée sur `main` et à chaque pull request (Python 3.11 et 3.12).
 
 ```bash
 python pressvisual.py
+# ou, de façon équivalente :
+python -m pressvisual_app
 ```
 
 L'overlay reste invisible tant que vous ne tapez pas et ne cliquez pas.
@@ -534,7 +536,20 @@ Utilisez un dossier inscriptible avec
 ## Structure du projet
 
 ```
-pressvisual.py        Application complète (interface, capture, configuration)
+pressvisual.py        Point d'entrée (conserve l'API historique du module)
+pressvisual_app/      Code de l'application
+  config.py           Chargement, validation et persistance de la configuration
+  i18n.py             Traductions et choix de la langue
+  keymap.py           Raccourcis, libellés et combinaisons de touches
+  capture.py          Écoute globale du clavier et de la souris (pynput)
+  events.py           Événements et pont de signaux Qt
+  theme.py            Palette et utilitaires de couleur
+  widgets.py          Pastilles et lignes de badges
+  overlay.py          Fenêtre flottante
+  appearance.py       Fenêtre de personnalisation et aperçu
+  icon.py             Icône de l'application
+  tray.py             Icône de notification et menu
+  cli.py              Ligne de commande et démarrage
 translations/         Catalogues de traduction (.ts source, .qm compilé)
 tools/                Compilation des .ts en .qm (sans lrelease)
 tests/                Suite de tests hors écran (pytest)

@@ -47,7 +47,7 @@ jobs:
           python -m pip install -r requirements-dev.txt
 
       - name: Vérifier la compilation
-        run: python -m py_compile pressvisual.py
+        run: python -m compileall -q pressvisual.py pressvisual_app tools
 
       # Les tests utilisent le greffon Qt « offscreen » : aucune fenêtre ne
       # s'ouvre. Xvfb fournit seulement l'affichage X11 dont pynput a besoin

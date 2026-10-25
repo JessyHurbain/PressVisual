@@ -9,9 +9,11 @@ from pathlib import Path
 import pytest
 
 import pressvisual
+from pressvisual_app import i18n as pv_i18n
 from tools import compile_translations
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+APP_DIR = PROJECT_ROOT / "pressvisual_app"
 TS_PATH = PROJECT_ROOT / "translations" / "pressvisual_en.ts"
 
 LABEL_FIELDS = (
@@ -29,21 +31,20 @@ LABEL_FIELDS = (
 
 def ui_sources() -> set[str]:
     """Toutes les chaînes d'interface présentes dans le code."""
-    tree = ast.parse(
-        (PROJECT_ROOT / "pressvisual.py").read_text(encoding="utf-8")
-    )
     found: set[str] = set()
-    for node in ast.walk(tree):
-        if (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "_t"
-        ):
-            for argument in node.args:
-                if isinstance(argument, ast.Constant) and isinstance(
-                    argument.value, str
-                ):
-                    found.add(argument.value)
+    for module_path in sorted(APP_DIR.glob("*.py")):
+        tree = ast.parse(module_path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "_t"
+            ):
+                for argument in node.args:
+                    if isinstance(argument, ast.Constant) and isinstance(
+                        argument.value, str
+                    ):
+                        found.add(argument.value)
     found.update(pressvisual.SPECIAL_KEY_LABELS.values())
     found.update(pressvisual.POSITION_LABELS.values())
     found.update(str(value) for value in pressvisual.MULTI_CLICK_LABELS.values())
@@ -98,7 +99,7 @@ def test_french_is_the_source_language(qapp):
 
 
 def test_missing_catalog_is_reported(qapp, monkeypatch, capsys, tmp_path):
-    monkeypatch.setattr(pressvisual, "translations_directory", lambda: tmp_path)
+    monkeypatch.setattr(pv_i18n, "translations_directory", lambda: tmp_path)
 
     assert pressvisual.install_translator(qapp, "en") is None
     assert "Traduction introuvable" in capsys.readouterr().err
@@ -230,7 +231,7 @@ def test_explicit_language_is_honoured(value, expected):
 )
 def test_auto_language_follows_system(monkeypatch, system_locale, expected):
     fake = types.SimpleNamespace(name=lambda: system_locale)
-    monkeypatch.setattr(pressvisual.QLocale, "system", lambda: fake)
+    monkeypatch.setattr(pv_i18n.QLocale, "system", lambda: fake)
 
     assert pressvisual.resolve_language("auto") == expected
     assert pressvisual.resolve_language("") == expected
@@ -238,7 +239,7 @@ def test_auto_language_follows_system(monkeypatch, system_locale, expected):
 
 def test_unknown_language_falls_back_to_system(monkeypatch):
     fake = types.SimpleNamespace(name=lambda: "fr_FR")
-    monkeypatch.setattr(pressvisual.QLocale, "system", lambda: fake)
+    monkeypatch.setattr(pv_i18n.QLocale, "system", lambda: fake)
 
     assert pressvisual.resolve_language("allemand") == "fr"
 

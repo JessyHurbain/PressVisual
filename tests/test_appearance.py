@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 
 from PyQt6.QtGui import QColor, QFontDatabase
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QDialog
 
 import pressvisual
+from pressvisual_app import overlay as overlay_module
 
 
 # ---------------------------------------------------------------------------
@@ -196,12 +197,12 @@ def test_edit_appearance_applies_language_and_saves_it(
             pass
 
         def exec(self):
-            return pressvisual.QDialog.DialogCode.Accepted
+            return QDialog.DialogCode.Accepted
 
         def values(self):
             return {"language": "en", "opacity": 0.5}
 
-    monkeypatch.setattr(pressvisual, "AppearanceDialog", FakeDialog)
+    monkeypatch.setattr(overlay_module, "AppearanceDialog", FakeDialog)
 
     overlay.edit_appearance()
 
@@ -223,12 +224,12 @@ def test_edit_appearance_keeps_language_silent_when_unchanged(
             pass
 
         def exec(self):
-            return pressvisual.QDialog.DialogCode.Accepted
+            return QDialog.DialogCode.Accepted
 
         def values(self):
             return {"language": "auto"}
 
-    monkeypatch.setattr(pressvisual, "AppearanceDialog", FakeDialog)
+    monkeypatch.setattr(overlay_module, "AppearanceDialog", FakeDialog)
 
     overlay.edit_appearance()
 

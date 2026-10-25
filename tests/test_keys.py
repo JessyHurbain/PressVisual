@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 from pynput import keyboard
 
@@ -53,14 +55,14 @@ def test_classify_digit_without_char_uses_virtual_key():
 
 
 def test_classify_numpad_on_windows(monkeypatch):
-    monkeypatch.setattr(pressvisual.sys, "platform", "win32")
+    monkeypatch.setattr(sys, "platform", "win32")
 
     assert pressvisual._classify_key(keyboard.KeyCode(vk=96)) == ("0", "0", False)
     assert pressvisual._classify_key(keyboard.KeyCode(vk=110)) == (".", ".", False)
 
 
 def test_classify_numpad_ignored_outside_windows(monkeypatch):
-    monkeypatch.setattr(pressvisual.sys, "platform", "linux")
+    monkeypatch.setattr(sys, "platform", "linux")
 
     # Hors Windows, un pavé numérique sans caractère n'est pas devinable.
     assert pressvisual._classify_key(keyboard.KeyCode(vk=96)) == (None, None, False)

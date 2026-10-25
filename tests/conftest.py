@@ -20,6 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import pytest  # noqa: E402 - après le réglage de QT_QPA_PLATFORM
+from PyQt6.QtWidgets import QApplication  # noqa: E402
 
 import pressvisual  # noqa: E402 - dépend du réglage ci-dessus
 
@@ -27,10 +28,10 @@ import pressvisual  # noqa: E402 - dépend du réglage ci-dessus
 @pytest.fixture(scope="session")
 def qapp():
     """Instance unique de QApplication pour toute la session."""
-    app = pressvisual.QApplication.instance()
+    app = QApplication.instance()
     created = app is None
     if created:
-        app = pressvisual.QApplication([])
+        app = QApplication([])
     app.setApplicationName("PressVisual tests")
     yield app
     if created:
