@@ -497,7 +497,12 @@ class InputView(QWidget):
         self.updateGeometry()
 
     def _apply_visibility(self) -> None:
-        # La souris n'a de sens que si ses clics sont capturés.
+        # La souris n'a de sens que si elle est affichée et capturée.
+        mouse_visible = (
+            self._visible
+            and bool(self._cfg.capture_mouse)
+            and bool(self._cfg.show_mouse)
+        )
         self.keyboard.setVisible(self._visible)
-        self.mouse.setVisible(self._visible and bool(self._cfg.capture_mouse))
+        self.mouse.setVisible(mouse_visible)
         self.setVisible(self._visible)

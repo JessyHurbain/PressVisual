@@ -21,6 +21,7 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QColorDialog,
     QComboBox,
     QDialog,
@@ -355,6 +356,12 @@ class AppearanceDialog(QDialog):
         index = self.layout_combo.findData(str(config.keyboard_layout).strip().lower())
         self.layout_combo.setCurrentIndex(index if index >= 0 else 0)
         display_form.addRow(_t("Disposition du clavier"), self.layout_combo)
+
+        self.show_mouse = QCheckBox(
+            _t("Afficher la souris à côté du clavier"), display_group
+        )
+        self.show_mouse.setChecked(bool(config.show_mouse))
+        display_form.addRow(self.show_mouse)
         outer.addWidget(display_group)
 
         interface_group = QGroupBox(_t("Interface"), self)
@@ -415,6 +422,7 @@ class AppearanceDialog(QDialog):
         self.max_width.valueChanged.connect(self._refresh_preview)
         self.mode_combo.currentIndexChanged.connect(self._refresh_preview)
         self.layout_combo.currentIndexChanged.connect(self._refresh_preview)
+        self.show_mouse.toggled.connect(self._refresh_preview)
 
         self._refresh_preview()
         self.adjustSize()
@@ -437,6 +445,7 @@ class AppearanceDialog(QDialog):
             "language": self.language_combo.currentData() or LANGUAGE_AUTO,
             "display_mode": self.mode_combo.currentData() or "overlay",
             "keyboard_layout": self.layout_combo.currentData() or "azerty",
+            "show_mouse": self.show_mouse.isChecked(),
             "opacity": self.opacity_slider.value() / 100.0,
             "font_family": family,
             "font_size": self.font_size.value(),
@@ -481,6 +490,7 @@ class AppearanceDialog(QDialog):
             self.mode_combo.setCurrentIndex(index if index >= 0 else 0)
             index = self.layout_combo.findData(defaults.keyboard_layout)
             self.layout_combo.setCurrentIndex(index if index >= 0 else 0)
+            self.show_mouse.setChecked(defaults.show_mouse)
         finally:
             self._updating = False
         self._refresh_preview()

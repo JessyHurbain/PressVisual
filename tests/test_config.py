@@ -143,6 +143,7 @@ def test_validate_converts_boolean_aliases():
         ignore_key_repeats=0,
         concat_text="oui",
         start_hidden=None,
+        show_mouse="non",
     )
 
     config.validate()
@@ -151,6 +152,11 @@ def test_validate_converts_boolean_aliases():
     assert config.ignore_key_repeats is False
     assert config.concat_text is True
     assert config.start_hidden is True
+    assert config.show_mouse is False
+
+
+def test_show_mouse_is_on_by_default():
+    assert pressvisual.Config().show_mouse is True
 
 
 def test_validate_normalises_filtered_keys():
@@ -329,6 +335,19 @@ def test_save_appearance_keeps_display_settings(tmp_path):
     assert data["display_mode"] == "keyboard"
     assert data["keyboard_layout"] == "qwerty"
     assert data["position"] == "top-left"
+
+
+def test_save_appearance_keeps_the_mouse_setting(tmp_path):
+    path = tmp_path / "config.json"
+    config = pressvisual.Config.load(path, lambda _message: None)
+
+    assert config.save_appearance({"show_mouse": False})
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["show_mouse"] is False
+
+    reloaded = pressvisual.Config.load(path, lambda _message: None)
+    assert reloaded.show_mouse is False
 
 
 def test_save_appearance_round_trip(tmp_path):

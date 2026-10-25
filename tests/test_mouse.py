@@ -182,6 +182,22 @@ def test_mouse_is_hidden_when_clicks_are_not_captured(qapp, config):
         view.deleteLater()
 
 
+def test_mouse_can_be_hidden_by_the_setting(qapp, config):
+    font = QFont("DejaVu Sans")
+    config.show_mouse = False
+    view = pressvisual.InputView(config, font, pressvisual.Palette.from_config(config))
+    try:
+        assert view.mouse.isHidden() is True
+        assert view.keyboard.isHidden() is False
+
+        config.show_mouse = True
+        view.set_config(config)
+
+        assert view.mouse.isHidden() is False
+    finally:
+        view.deleteLater()
+
+
 def test_switching_to_badges_hides_both_views(qapp, config):
     font = QFont("DejaVu Sans")
     view = pressvisual.InputView(config, font, pressvisual.Palette.from_config(config))
@@ -330,6 +346,24 @@ def test_switching_modes_clears_the_mouse(qapp, config):
         close_overlay(overlay, qapp)
 
 
+def test_hidden_mouse_stays_hidden_after_a_mode_change(qapp, config):
+    config.show_mouse = False
+    overlay = make_keyboard_overlay(qapp, config)
+    try:
+        assert overlay._mouse.isHidden() is True
+
+        overlay.apply_appearance({"display_mode": "overlay"})
+        overlay.apply_appearance({"display_mode": "keyboard"})
+
+        assert overlay._mouse.isHidden() is True
+
+        overlay.apply_appearance({"show_mouse": True})
+
+        assert overlay._mouse.isHidden() is False
+    finally:
+        close_overlay(overlay, qapp)
+
+
 def test_masking_keeps_the_mouse_visible(qapp, config):
     overlay = make_keyboard_overlay(qapp, config)
     try:
@@ -361,6 +395,23 @@ def test_keyboard_mode_paints_the_mouse(qapp, config):
 # ---------------------------------------------------------------------------
 # Fenêtre d'apparence
 # ---------------------------------------------------------------------------
+
+
+def test_preview_hides_the_mouse_when_unchecked(qapp, config):
+    dialog = pressvisual.AppearanceDialog(config, "DejaVu Sans")
+    qapp.processEvents()
+    try:
+        assert dialog.show_mouse.isChecked() is True
+        dialog.mode_combo.setCurrentIndex(dialog.mode_combo.findData("keyboard"))
+        assert dialog.preview._mouse.isHidden() is False
+
+        dialog.show_mouse.setChecked(False)
+
+        assert dialog.values()["show_mouse"] is False
+        assert dialog.preview._mouse.isHidden() is True
+        assert dialog.preview._keyboard.isHidden() is False
+    finally:
+        dialog.deleteLater()
 
 
 def test_preview_shows_the_mouse_with_the_keyboard(qapp, config):

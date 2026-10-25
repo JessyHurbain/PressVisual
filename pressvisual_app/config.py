@@ -37,6 +37,7 @@ APPEARANCE_CONFIG_KEYS: tuple[str, ...] = (
     "margin",
     "display_mode",
     "keyboard_layout",
+    "show_mouse",
 )
 # ---------------------------------------------------------------------------
 # Configuration
@@ -65,6 +66,7 @@ class Config:
     position: str = "bottom-right"     # top-left | top-right | bottom-left | bottom-right | bottom-center
     display_mode: str = "overlay"      # overlay (pastilles) | keyboard (clavier complet)
     keyboard_layout: str = "azerty"    # azerty | qwerty
+    show_mouse: bool = True            # souris à côté du clavier (mode keyboard)
     #: Position libre mémorisée : (x, y, largeur, hauteur).
     free_position: Optional[tuple[int, int, int, int]] = None
     language: str = LANGUAGE_AUTO       # auto (système) | fr | en
@@ -265,6 +267,7 @@ class Config:
         for flag in (
             "capture_keyboard",
             "capture_mouse",
+            "show_mouse",
             "ignore_key_repeats",
             "ignore_overlay_clicks",
             "concat_text",

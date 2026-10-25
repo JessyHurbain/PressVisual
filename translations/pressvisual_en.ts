@@ -16,6 +16,10 @@
         <translation>Show overlay</translation>
     </message>
     <message>
+        <source>Afficher la souris à côté du clavier</source>
+        <translation>Show the mouse next to the keyboard</translation>
+    </message>
+    <message>
         <source>Afficher/masquer</source>
         <translation>Show/hide</translation>
     </message>

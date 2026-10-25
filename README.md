@@ -233,6 +233,9 @@ réagissent, ce qui met le geste en avant pour une démonstration ou un tutoriel
   sens du défilement (haut, bas, gauche, droite) pendant un court instant,
   puisqu'un cran n'a pas de relâchement. Avec `"capture_mouse": false`, la
   souris n'est pas dessinée.
+- La souris se masque sans changer de mode : décochez **Afficher la souris à
+  côté du clavier** dans la fenêtre de personnalisation, ou mettez
+  `"show_mouse": false`. Le clavier reste alors seul dans la bulle.
 - La taille du clavier et de la souris suit la police et sa « Taille » :
   augmentez `font_size` pour une vue plus grande à l'écran.
 - Le **mode masqué** (`Ctrl + F10`) n'allume aucune touche de caractère : les
@@ -253,9 +256,9 @@ fenêtre de réglages avec un aperçu en direct :
   pour rester cohérents.
 - **Mise en forme** : police, taille, opacité du fond, rayon des coins, marge
   avec le bord de l'écran et largeur maximale.
-- **Affichage** : mode (overlay standard ou clavier complet) et disposition du
-  clavier (AZERTY ou QWERTY). L'aperçu bascule immédiatement sur le clavier et
-  sa souris lorsqu'on choisit ce mode.
+- **Affichage** : mode (overlay standard ou clavier complet), disposition du
+  clavier (AZERTY ou QWERTY) et case **Afficher la souris à côté du clavier**.
+  L'aperçu bascule immédiatement sur le clavier, avec ou sans sa souris.
 - **Interface** : langue de l'interface (automatique, français ou anglais).
   Le changement s'applique dès l'enregistrement, sans redémarrer.
 - **Réinitialiser** restaure les valeurs d'origine, **Annuler** ferme sans rien
@@ -348,6 +351,7 @@ Le dossier qui contient le fichier doit donc être accessible en écriture.
   "position": "bottom-right",
   "display_mode": "overlay",
   "keyboard_layout": "azerty",
+  "show_mouse": true,
   "language": "auto",
   "concat_text": false,
   "typing_join_delay": 1.1,
@@ -413,6 +417,7 @@ Le dossier qui contient le fichier doit donc être accessible en écriture.
 | `position` | `top-left`, `top-right`, `bottom-left`, `bottom-right` ou `bottom-center`. |
 | `display_mode` | `overlay` (pastilles de frappes) ou `keyboard` (clavier compact dont les touches s'allument). |
 | `keyboard_layout` | `azerty` ou `qwerty`, utilisé en mode `keyboard`. |
+| `show_mouse` | Afficher la souris à côté du clavier en mode `keyboard` (défaut `true`). |
 | `free_position` | Position libre enregistrée après un glisser, sous la forme `[x, y, largeur, hauteur]`. `null` = aucun déplacement manuel mémorisé. |
 | `language` | Langue de l'interface : `auto` (défaut, locale du système), `fr` ou `en`. |
 | `concat_text` | `false` (défaut) : une pastille par touche. `true` : les caractères s'ajoutent dans une ligne de texte. |

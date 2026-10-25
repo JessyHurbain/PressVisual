@@ -179,6 +179,7 @@ def test_display_settings_are_translated(english, qapp, config):
 
         assert labels == ["Standard overlay", "Full keyboard"]
         assert layouts == ["AZERTY (French)", "QWERTY (English)"]
+        assert dialog.show_mouse.text() == "Show the mouse next to the keyboard"
     finally:
         dialog.deleteLater()
 
