@@ -53,6 +53,8 @@ plan, et n'apparaît que lorsqu'il y a quelque chose à montrer.
   masquage, personnalisation de l'apparence, choix du coin d'ancrage, quitter.
 - **Multi-écrans** : positionnement aux quatre coins (haut/bas, gauche/droite)
   ou en bas au centre, sur l'écran où se trouve le curseur.
+- **Interface bilingue** : français et anglais, suivant la langue du système ou
+  forcée avec `--lang` (ou la clé `language` de `config.json`).
 - **Aucune donnée envoyée sur le réseau**. L'application est entièrement locale.
 
 ## Prérequis
@@ -83,6 +85,26 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
+## Tests
+
+La suite de tests s'exécute sans ouvrir de fenêtre (greffon Qt `offscreen`) :
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest
+```
+
+Les tests couvrent la configuration (chargement, validation, enregistrement),
+l'analyse des raccourcis et des touches, le fil de capture (modificateurs avec
+la souris, molette, double-clic), le rendu de l'overlay (combinaisons, texte
+continu, agrégation de la molette, masquage), la fenêtre d'apparence et les
+traductions (catalogue complet, `.qm` à jour, rendu en anglais).
+
+Sous Linux sans session graphique, l'import de `pynput` a besoin d'un serveur
+X11 : lancez alors `xvfb-run -a python -m pytest`. C'est ce que fait le workflow
+[`.github/workflows/tests.yml`](.github/workflows/tests.yml), exécuté à chaque
+poussée sur `main` et à chaque pull request (Python 3.11 et 3.12).
+
 ## Lancement
 
 ```bash
@@ -97,6 +119,7 @@ L'icône PressVisual apparaît dans la zone de notification.
 | Option | Description |
 | --- | --- |
 | `--config FICHIER` | Charge un fichier JSON de configuration. |
+| `--lang LANGUE` | Langue de l'interface : `auto` (locale du système), `fr` ou `en`. |
 | `--duration SEC` | Durée de maintien après la dernière entrée (0,3 à 30 s). |
 | `--opacity VALEUR` | Opacité du fond, de `0.15` à `1.0`. |
 | `--font-size PT` | Taille de police (9 à 40 pt). |
@@ -172,6 +195,8 @@ fenêtre de réglages avec un aperçu en direct :
   pour rester cohérents.
 - **Mise en forme** : police, taille, opacité du fond, rayon des coins, marge
   avec le bord de l'écran et largeur maximale.
+- **Interface** : langue de l'interface (automatique, français ou anglais).
+  Le changement s'applique dès l'enregistrement, sans redémarrer.
 - **Réinitialiser** restaure les valeurs d'origine, **Annuler** ferme sans rien
   changer et **Enregistrer** applique les réglages immédiatement puis les écrit
   dans le fichier de configuration.
@@ -260,6 +285,7 @@ Le dossier qui contient le fichier doit donc être accessible en écriture.
   "corner_radius": 16,
   "margin": 28,
   "position": "bottom-right",
+  "language": "auto",
   "concat_text": false,
   "typing_join_delay": 1.1,
 
@@ -316,6 +342,7 @@ Le dossier qui contient le fichier doit donc être accessible en écriture.
 | `key_text_color` | Texte des pastilles de touches. |
 | `accent_color` | Accent des clics souris, des messages d'état et de la molette. |
 | `position` | `top-left`, `top-right`, `bottom-left`, `bottom-right` ou `bottom-center`. |
+| `language` | Langue de l'interface : `auto` (défaut, locale du système), `fr` ou `en`. |
 | `concat_text` | `false` (défaut) : une pastille par touche. `true` : les caractères s'ajoutent dans une ligne de texte. |
 | `typing_join_delay` | Pause (s) qui clôt la ligne de texte en mode `concat_text`. |
 | `capture_keyboard` | Afficher les frappes (les raccourcis restent actifs même si `false`). |
@@ -323,7 +350,7 @@ Le dossier qui contient le fichier doit donc être accessible en écriture.
 | `ignore_key_repeats` | Ne pas répéter une touche maintenue enfoncée. |
 | `ignore_overlay_clicks` | Ne pas afficher les clics effectués sur la bulle elle-même. |
 | `filtered_keys` | Jetons de touches à ignorer (`"f12"`, `"print_screen"`, `"a"`…). |
-| `*_label` | Libellés des badges. Passez `shift_label` à `"Shift"` et `win_label` à `"Cmd"` pour une interface anglaise / macOS. |
+| `*_label` | Libellés des badges. Leurs valeurs par défaut sont traduites avec l'interface ; une valeur personnalisée est affichée telle quelle (par exemple `win_label` à `"Cmd"` sous macOS). |
 | `hotkey_*` | Raccourcis globaux au format `modificateur+touche` (chaîne vide = désactivé). |
 | `start_hidden` | Démarre avec la capture suspendue. |
 | `click_through_on_start` | Démarre en mode clics traversants. |
@@ -338,8 +365,43 @@ badges d'accent sont alors recalculés à partir de ces valeurs.
 
 Les réglages enregistrés par la fenêtre sont : `background_color`,
 `background_color_bottom`, `text_color`, `key_background_color`,
-`key_text_color`, `accent_color`, `opacity`, `font_family`, `font_size`,
-`max_width`, `corner_radius` et `margin`.
+`key_text_color`, `accent_color`, `language`, `opacity`, `font_family`,
+`font_size`, `max_width`, `corner_radius` et `margin`.
+
+## Langues
+
+L'interface existe en **français** et en **anglais**. Le français est la langue
+source, écrite directement dans `pressvisual.py` ; l'anglais est fourni par le
+catalogue `translations/pressvisual_en.qm`.
+
+- `language` dans `config.json`, ou `--lang` en ligne de commande, accepte
+  `auto`, `fr` et `en`. `--lang` est prioritaire sur le fichier.
+- `auto` (défaut) suit la locale du système : français si elle commence par
+  `fr`, anglais sinon.
+- La langue se choisit aussi dans **Personnaliser l'overlay… → Interface** ;
+  le changement s'applique dès l'enregistrement, sans redémarrage.
+- Les libellés de `config.json` restent ceux que vous y avez écrits ; leurs
+  valeurs par défaut sont traduites à l'affichage.
+
+```bash
+python pressvisual.py --lang en
+```
+
+Pour corriger ou compléter une traduction, modifiez
+[`translations/pressvisual_en.ts`](translations/pressvisual_en.ts) puis
+régénérez le `.qm` :
+
+```bash
+python tools/compile_translations.py --verify
+```
+
+`lrelease` n'est pas nécessaire : le script écrit directement le format
+binaire de Qt, et `--verify` recharge le résultat avec `QTranslator`. Un test
+de la suite vérifie que le `.qm` livré correspond bien au `.ts`.
+
+Pour un exécutable PyInstaller, embarquez le dossier des traductions :
+`--add-data "translations:translations"` (Windows :
+`--add-data "translations;translations"`).
 
 ## Empaqueter en exécutable autonome
 
@@ -421,6 +483,10 @@ ou un `.deb` peuvent être construits à partir de cet exécutable.
 - Le fichier `config.json` n'est pas embarqué automatiquement dans le binaire :
   il est lu à côté de l'exécutable au démarrage, et le menu y enregistre le
   dernier coin choisi.
+- Le dossier `translations/` doit être embarqué pour l'interface anglaise :
+  ajoutez `--add-data "translations:translations"` (Windows :
+  `--add-data "translations;translations"`). Sans lui, l'application reste en
+  français.
 
 ## Dépannage
 
@@ -468,9 +534,14 @@ Utilisez un dossier inscriptible avec
 ## Structure du projet
 
 ```
-pressvisual.py   Application complète (interface, capture, configuration)
-requirements.txt Dépendances d'exécution
-README.md        Ce document
+pressvisual.py        Application complète (interface, capture, configuration)
+translations/         Catalogues de traduction (.ts source, .qm compilé)
+tools/                Compilation des .ts en .qm (sans lrelease)
+tests/                Suite de tests hors écran (pytest)
+.github/workflows/    Intégration continue (compilation + tests)
+requirements.txt      Dépendances d'exécution
+requirements-dev.txt  Dépendances de développement (pytest)
+README.md             Ce document
 ```
 
 ## Licence

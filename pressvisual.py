@@ -44,7 +44,9 @@ from typing import Iterable, Optional
 try:
     from PyQt6.QtCore import (
         QAbstractAnimation,
+        QCoreApplication,
         QEasingCurve,
+        QLocale,
         QObject,
         QPoint,
         QPropertyAnimation,
@@ -52,6 +54,7 @@ try:
         QSize,
         Qt,
         QTimer,
+        QTranslator,
         pyqtSignal,
     )
     from PyQt6.QtGui import (
@@ -74,6 +77,7 @@ try:
     from PyQt6.QtWidgets import (
         QApplication,
         QColorDialog,
+        QComboBox,
         QDialog,
         QDialogButtonBox,
         QFontComboBox,
@@ -119,6 +123,16 @@ except Exception as exc:  # pragma: no cover - dépend de l'environnement
 # ---------------------------------------------------------------------------
 
 APP_NAME = "PressVisual"
+
+#: Langues pour lesquelles un catalogue ``.qm`` est fourni (le français est
+#: la langue source, écrite directement dans le code).
+SUPPORTED_LANGUAGES: tuple[str, ...] = ("fr", "en")
+
+#: Valeur de configuration « suivre la langue du système ».
+LANGUAGE_AUTO = "auto"
+
+#: Contexte utilisé par toutes les chaînes traduisibles.
+TRANSLATION_CONTEXT = "PressVisual"
 
 #: Positions proposées pour l'overlay (quatre coins + bas centre).
 POSITION_CHOICES: tuple[str, ...] = (
@@ -217,6 +231,7 @@ APPEARANCE_COLOR_FIELDS: tuple[str, ...] = (
 #: Réglages enregistrés par la fenêtre de personnalisation.
 APPEARANCE_CONFIG_KEYS: tuple[str, ...] = (
     *APPEARANCE_COLOR_FIELDS,
+    "language",
     "opacity",
     "font_family",
     "font_size",
@@ -265,6 +280,81 @@ MAX_TEXT_LENGTH = 200
 
 
 # ---------------------------------------------------------------------------
+# Traductions
+# ---------------------------------------------------------------------------
+
+
+def _t(text: str) -> str:
+    """Traduit un texte d'interface (la source est en français)."""
+    return QCoreApplication.translate(TRANSLATION_CONTEXT, text)
+
+
+def translations_directory() -> Path:
+    """Dossier des catalogues ``.qm`` (compatible PyInstaller)."""
+    bundle = getattr(sys, "_MEIPASS", None)
+    if getattr(sys, "frozen", False) and bundle:
+        candidate = Path(bundle) / "translations"
+        if candidate.is_dir():
+            return candidate
+    return Path(__file__).resolve().parent / "translations"
+
+
+def resolve_language(configured: str) -> str:
+    """Langue effective : choix explicite, sinon langue du système.
+
+    Une locale inconnue (allemand, espagnol...) retombe sur l'anglais, qui
+    sert de langue de repli aux côtés du français.
+    """
+    value = str(configured or LANGUAGE_AUTO).strip().lower().replace("_", "-")
+    if value in SUPPORTED_LANGUAGES:
+        return value
+    if value.startswith("fr"):
+        return "fr"
+    if value.startswith("en"):
+        return "en"
+    system = QLocale.system().name().lower()
+    return "fr" if system.startswith("fr") else "en"
+
+
+def install_translator(
+    app: QApplication, language: str, previous: Optional[QTranslator] = None
+) -> Optional[QTranslator]:
+    """Installe le catalogue de ``language`` et renvoie le traducteur.
+
+    Le français étant la langue source, aucun catalogue n'est nécessaire :
+    l'application affiche alors ses chaînes telles quelles.
+    """
+    if previous is not None:
+        app.removeTranslator(previous)
+    if language == "fr":
+        return None
+
+    translator = QTranslator(app)
+    path = translations_directory() / f"pressvisual_{language}.qm"
+    if not translator.load(str(path)):
+        sys.stderr.write(
+            f"[{APP_NAME}] "
+            + _t("Traduction introuvable ou illisible : {path}").format(path=path)
+            + "\n"
+        )
+        return None
+    app.installTranslator(translator)
+    return translator
+
+
+def apply_language_change(
+    app: QApplication,
+    tray: "TrayController",
+    translator: Optional[QTranslator],
+    language: str,
+) -> Optional[QTranslator]:
+    """Installe la langue choisie et rafraîchit les textes du menu."""
+    translator = install_translator(app, resolve_language(language), translator)
+    tray.retranslate()
+    return translator
+
+
+# ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
 
@@ -289,6 +379,7 @@ class Config:
     corner_radius: int = 16
     margin: int = 28                   # marge avec le bord de l'écran (px)
     position: str = "bottom-right"     # top-left | top-right | bottom-left | bottom-right | bottom-center
+    language: str = LANGUAGE_AUTO       # auto (système) | fr | en
     concat_text: bool = False           # True = regrouper le texte, False = touche par touche
     typing_join_delay: float = 1.1     # délai de concaténation du texte (s)
 
@@ -344,18 +435,28 @@ class Config:
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
-            warn(f"Configuration illisible ({path}) : {exc}")
+            warn(
+                _t("Configuration illisible ({path}) : {exc}").format(
+                    path=path, exc=exc
+                )
+            )
             return config
         if not isinstance(raw, dict):
-            warn(f"Configuration ignorée ({path}) : un objet JSON est attendu.")
+            warn(
+                _t("Configuration ignorée ({path}) : un objet JSON est attendu.").format(
+                    path=path
+                )
+            )
             return config
         for key, value in raw.items():
             if key == "path":
                 # Champ interne (emplacement du fichier) : jamais chargé.
-                warn("Clé réservée ignorée : path")
+                warn(_t("Clé réservée ignorée : path"))
                 continue
             if not hasattr(config, key):
-                warn(f"Clé de configuration inconnue ignorée : {key}")
+                warn(
+                    _t("Clé de configuration inconnue ignorée : {key}").format(key=key)
+                )
                 continue
             setattr(config, key, value)
         return config
@@ -370,10 +471,18 @@ class Config:
             try:
                 converted = cast(value)
             except (TypeError, ValueError):
-                notes.append(f"{name} invalide ({value!r}) : valeur par défaut utilisée.")
+                notes.append(
+                    _t("{name} invalide ({value}) : valeur par défaut utilisée.").format(
+                        name=name, value=repr(value)
+                    )
+                )
                 converted = cast(getattr(Config, name))
             if converted < low or converted > high:
-                notes.append(f"{name} hors limites : ramené dans [{low}, {high}]{unit}.")
+                notes.append(
+                    _t("{name} hors limites : ramené dans [{low}, {high}]{unit}.").format(
+                        name=name, low=low, high=high, unit=unit
+                    )
+                )
                 converted = min(max(converted, low), high)
             setattr(self, name, converted)
 
@@ -393,16 +502,29 @@ class Config:
             color = QColor(value) if isinstance(value, str) else QColor()
             if not color.isValid():
                 notes.append(
-                    f"{name} invalide ({value!r}) : couleur par défaut utilisée."
+                    _t(
+                        "{name} invalide ({value}) : couleur par défaut utilisée."
+                    ).format(name=name, value=repr(value))
                 )
                 color = QColor(getattr(Config, name))
             setattr(self, name, _color_to_text(color))
 
         if self.position not in POSITION_CHOICES:
             notes.append(
-                f"position inconnue ({self.position!r}) : « bottom-right » utilisée."
+                _t("position inconnue ({value}) : « bottom-right » utilisée.").format(
+                    value=repr(self.position)
+                )
             )
             self.position = "bottom-right"
+
+        self.language = str(self.language or LANGUAGE_AUTO).strip().lower()
+        if self.language not in (LANGUAGE_AUTO, *SUPPORTED_LANGUAGES):
+            notes.append(
+                _t("langue inconnue ({value}) : « auto » utilisée.").format(
+                    value=repr(self.language)
+                )
+            )
+            self.language = LANGUAGE_AUTO
 
         for flag in (
             "capture_keyboard",
@@ -416,7 +538,7 @@ class Config:
             setattr(self, flag, _as_bool(getattr(self, flag), True))
 
         if not isinstance(self.filtered_keys, (list, tuple)):
-            notes.append("filtered_keys doit être une liste : valeur ignorée.")
+            notes.append(_t("filtered_keys doit être une liste : valeur ignorée."))
             self.filtered_keys = []
         else:
             self.filtered_keys = [str(item).lower() for item in self.filtered_keys]
@@ -447,13 +569,13 @@ class Config:
         """Enregistre ``position`` dans le fichier JSON de configuration."""
         if position not in POSITION_CHOICES:
             return False
-        return self._update_config({"position": position}, "Position")
+        return self._update_config({"position": position}, _t("Position"))
 
     # ------------------------------------------------------------------
     def save_appearance(self, values: dict[str, object]) -> bool:
         """Enregistre les réglages d'apparence dans le fichier de configuration."""
         payload = {key: values[key] for key in APPEARANCE_CONFIG_KEYS if key in values}
-        return self._update_config(payload, "Apparence")
+        return self._update_config(payload, _t("Apparence"))
 
     # ------------------------------------------------------------------
     def _update_config(self, values: dict[str, object], what: str) -> bool:
@@ -473,13 +595,21 @@ class Config:
                 raw = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, ValueError) as exc:
                 sys.stderr.write(
-                    f"[{APP_NAME}] {what} non enregistrée ({path}) : {exc}\n"
+                    f"[{APP_NAME}] "
+                    + _t("{what} non enregistrée ({path}) : {exc}").format(
+                        what=what, path=path, exc=exc
+                    )
+                    + "\n"
                 )
                 return False
             if not isinstance(raw, dict):
                 sys.stderr.write(
-                    f"[{APP_NAME}] {what} non enregistrée ({path}) : "
-                    "un objet JSON est attendu.\n"
+                    f"[{APP_NAME}] "
+                    + _t(
+                        "{what} non enregistrée ({path}) : "
+                        "un objet JSON est attendu."
+                    ).format(what=what, path=path)
+                    + "\n"
                 )
                 return False
             data = raw
@@ -500,7 +630,11 @@ class Config:
             os.replace(temp_path, path)
         except OSError as exc:
             sys.stderr.write(
-                f"[{APP_NAME}] {what} non enregistrée ({path}) : {exc}\n"
+                f"[{APP_NAME}] "
+                + _t("{what} non enregistrée ({path}) : {exc}").format(
+                    what=what, path=path, exc=exc
+                )
+                + "\n"
             )
             try:
                 temp_path.unlink(missing_ok=True)
@@ -557,12 +691,14 @@ def parse_hotkey(spec: str) -> Optional[tuple[frozenset[str], str]]:
 
 def modifier_label(config: Config, modifier: str) -> str:
     """Libellé d'un modificateur selon la configuration."""
-    return {
-        "ctrl": config.ctrl_label,
-        "alt": config.alt_label,
-        "shift": config.shift_label,
-        "win": config.win_label,
-    }.get(modifier, modifier.capitalize())
+    return _t(
+        {
+            "ctrl": config.ctrl_label,
+            "alt": config.alt_label,
+            "shift": config.shift_label,
+            "win": config.win_label,
+        }.get(modifier, modifier.capitalize())
+    )
 
 
 def key_label(config: Config, token: str) -> str:
@@ -571,7 +707,7 @@ def key_label(config: Config, token: str) -> str:
     if lowered in MODIFIER_ORDER:
         return modifier_label(config, lowered)
     if lowered in SPECIAL_KEY_LABELS:
-        return SPECIAL_KEY_LABELS[lowered]
+        return _t(SPECIAL_KEY_LABELS[lowered])
     if len(lowered) > 1 and lowered[0] == "f" and lowered[1:].isdigit():
         return lowered.upper()
     if len(token) == 1:
@@ -704,7 +840,7 @@ class InputListener(threading.Thread):
             self._keyboard_listener.start()
         except Exception as exc:  # permission refusée, pas de session X11, ...
             self._keyboard_listener = None
-            errors.append(f"clavier : {exc}")
+            errors.append(_t("clavier : {error}").format(error=exc))
 
         if self._config.capture_mouse:
             try:
@@ -715,17 +851,18 @@ class InputListener(threading.Thread):
                 self._mouse_listener.start()
             except Exception as exc:
                 self._mouse_listener = None
-                errors.append(f"souris : {exc}")
+                errors.append(_t("souris : {error}").format(error=exc))
 
         if errors:
             self._report_error(
-                "Impossible de démarrer la capture globale des entrées.\n"
-                + "\n".join(f"• {error}" for error in errors)
-                + "\n\n"
-                "• macOS : autorisez le Terminal (ou PressVisual) dans Réglages Système "
-                "→ Confidentialité et sécurité → Accessibilité.\n"
-                "• Linux : un serveur X11 (ou XWayland) est nécessaire pour les "
-                "raccourcis globaux."
+                _t(
+                    "Impossible de démarrer la capture globale des entrées.\n"
+                    "{details}\n\n"
+                    "• macOS : autorisez le Terminal (ou PressVisual) dans Réglages "
+                    "Système → Confidentialité et sécurité → Accessibilité.\n"
+                    "• Linux : un serveur X11 (ou XWayland) est nécessaire pour les "
+                    "raccourcis globaux."
+                ).format(details="\n".join(f"• {error}" for error in errors))
             )
 
         if self._keyboard_listener is None and self._mouse_listener is None:
@@ -801,7 +938,9 @@ class InputListener(threading.Thread):
                 )
             )
         except Exception as exc:  # ne jamais laisser mourir le hook
-            self._report_error(f"Erreur pendant la lecture du clavier : {exc}")
+            self._report_error(
+                _t("Erreur pendant la lecture du clavier : {error}").format(error=exc)
+            )
 
     def _on_release(self, key) -> None:
         try:
@@ -819,7 +958,9 @@ class InputListener(threading.Thread):
             if token:
                 self._held.discard(token.lower())
         except Exception as exc:
-            self._report_error(f"Erreur pendant la lecture du clavier : {exc}")
+            self._report_error(
+                _t("Erreur pendant la lecture du clavier : {error}").format(error=exc)
+            )
 
     # ------------------------------------------------------------------
     # Souris
@@ -855,7 +996,9 @@ class InputListener(threading.Thread):
                 )
             )
         except Exception as exc:
-            self._report_error(f"Erreur pendant la lecture de la souris : {exc}")
+            self._report_error(
+                _t("Erreur pendant la lecture de la souris : {error}").format(error=exc)
+            )
 
     def _on_scroll(self, x, y, dx, dy) -> None:
         try:
@@ -875,7 +1018,9 @@ class InputListener(threading.Thread):
                 )
             )
         except Exception as exc:
-            self._report_error(f"Erreur pendant la lecture de la souris : {exc}")
+            self._report_error(
+                _t("Erreur pendant la lecture de la souris : {error}").format(error=exc)
+            )
 
     # ------------------------------------------------------------------
     def _report_error(self, message: str) -> None:
@@ -1230,6 +1375,7 @@ class Overlay(QWidget):
     """Fenêtre flottante affichant les frappes et les clics."""
 
     state_changed = pyqtSignal()
+    language_changed = pyqtSignal(str)
 
     def __init__(self, config: Config) -> None:
         super().__init__(
@@ -1485,7 +1631,9 @@ class Overlay(QWidget):
         self._cfg.remember_position(position)
         if announce:
             self._status(
-                f"Position : {POSITION_LABELS.get(position, position)}"
+                _t("Position : {label}").format(
+                    label=_t(POSITION_LABELS.get(position, position))
+                )
             )
         self.state_changed.emit()
 
@@ -1929,7 +2077,7 @@ class Overlay(QWidget):
         if recent:
             self._scroll_count += 1
             self._scroll_time = now
-            base = (
+            base = _t(
                 self._cfg.scroll_up_label
                 if self._scroll_direction > 0
                 else self._cfg.scroll_down_label
@@ -1948,7 +2096,7 @@ class Overlay(QWidget):
         self._scroll_count = 1
         self._scroll_time = now
         self._scroll_mods = mods
-        base = (
+        base = _t(
             self._cfg.scroll_up_label
             if event.direction > 0
             else self._cfg.scroll_down_label
@@ -1970,7 +2118,7 @@ class Overlay(QWidget):
             and self._last_left_row in self._rows
             and now - self._last_left_time <= 0.9
         ):
-            label = MULTI_CLICK_LABELS.get(event.count, MULTI_CLICK_LABELS[3])
+            label = _t(MULTI_CLICK_LABELS.get(event.count, MULTI_CLICK_LABELS[3]))
             self._last_left_row.set_items(self._mouse_items(mods, label))
             self._last_left_time = now
             self._update_levels()
@@ -1983,13 +2131,13 @@ class Overlay(QWidget):
         self._scroll_row = None
 
         if button == "right":
-            label = self._cfg.click_right_label
+            label = _t(self._cfg.click_right_label)
         elif button == "middle":
-            label = self._cfg.click_middle_label
+            label = _t(self._cfg.click_middle_label)
         elif event.count >= 2:
-            label = MULTI_CLICK_LABELS.get(event.count, MULTI_CLICK_LABELS[3])
+            label = _t(MULTI_CLICK_LABELS.get(event.count, MULTI_CLICK_LABELS[3]))
         else:
-            label = self._cfg.click_left_label
+            label = _t(self._cfg.click_left_label)
 
         row = self._new_row(self._mouse_items(mods, label))
         if button == "left":
@@ -2019,7 +2167,7 @@ class Overlay(QWidget):
         self._capture_enabled = enabled
         if enabled:
             if announce:
-                self._status("Capture activée")
+                self._status(_t("Capture activée"))
         else:
             self._hide_now()
             self._clear_rows()
@@ -2052,9 +2200,9 @@ class Overlay(QWidget):
 
         if announce:
             self._status(
-                "Clics traversants : activés"
+                _t("Clics traversants : activés")
                 if enabled
-                else "Clics traversants : désactivés"
+                else _t("Clics traversants : désactivés")
             )
         self.state_changed.emit()
 
@@ -2066,9 +2214,9 @@ class Overlay(QWidget):
         self._masked = not self._masked
         self._clear_rows()
         self._status(
-            "Masquage des frappes : activé"
+            _t("Masquage des frappes : activé")
             if self._masked
-            else "Masquage des frappes : désactivé"
+            else _t("Masquage des frappes : désactivé")
         )
         self.state_changed.emit()
 
@@ -2092,18 +2240,22 @@ class Overlay(QWidget):
         if accepted != QDialog.DialogCode.Accepted:
             return
 
+        previous_language = self._cfg.language
         self.apply_appearance(dialog.values())
+        if self._cfg.language != previous_language:
+            self.language_changed.emit(self._cfg.language)
         payload = {
             key: getattr(self._cfg, key) for key in APPEARANCE_CONFIG_KEYS
         }
         if not self._cfg.save_appearance(payload):
             QMessageBox.warning(
                 None,
-                f"{APP_NAME} — configuration",
-                "L'apparence a été appliquée, mais elle n'a pas pu être "
-                "enregistrée dans :\n"
-                f"{self._cfg.path}\n\n"
-                "Vérifiez que le dossier est accessible en écriture.",
+                f"{APP_NAME} — {_t('configuration')}",
+                _t(
+                    "L'apparence a été appliquée, mais elle n'a pas pu être "
+                    "enregistrée dans :\n{path}\n\n"
+                    "Vérifiez que le dossier est accessible en écriture."
+                ).format(path=self._cfg.path),
             )
 
 
@@ -2118,7 +2270,7 @@ class ColorButton(QPushButton):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setIconSize(QSize(18, 18))
         self.setMinimumWidth(148)
-        self.setToolTip("Cliquer pour choisir une couleur")
+        self.setToolTip(_t("Cliquer pour choisir une couleur"))
         self.clicked.connect(self._pick)
         self._refresh()
 
@@ -2158,7 +2310,7 @@ class ColorButton(QPushButton):
 
     def _pick(self) -> None:
         chosen = QColorDialog.getColor(
-            self._color, self, "Choisir une couleur"
+            self._color, self, _t("Choisir une couleur")
         )
         if chosen.isValid():
             self.set_color(chosen)
@@ -2193,10 +2345,10 @@ class PreviewPanel(QWidget):
 
         self._rows: list[KeyRow] = []
         samples: tuple[tuple[tuple[str, str], ...], ...] = (
-            (("Ctrl", "mod"), ("+", "plus"), ("C", "key")),
-            (("Maj", "mod"), ("+", "plus"), ("→", "key")),
-            (("Clic gauche", "mouse"),),
-            (("bonjour", "text"),),
+            ((_t("Ctrl"), "mod"), ("+", "plus"), ("C", "key")),
+            ((_t("Maj"), "mod"), ("+", "plus"), ("→", "key")),
+            ((_t("Clic gauche"), "mouse"),),
+            ((_t("bonjour"), "text"),),
         )
         for items in samples:
             row = KeyRow(font, self._palette, self)
@@ -2280,7 +2432,7 @@ class AppearanceDialog(QDialog):
         super().__init__(parent)
         self._base_config = config
         self._updating = False
-        self.setWindowTitle(f"{APP_NAME} — Apparence")
+        self.setWindowTitle(f"{APP_NAME} — {_t('Apparence')}")
         self.setWindowIcon(build_app_icon())
         self.setModal(True)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
@@ -2290,19 +2442,21 @@ class AppearanceDialog(QDialog):
         outer.setContentsMargins(18, 16, 18, 16)
         outer.setSpacing(12)
 
-        title = QLabel("Personnaliser l'overlay", self)
+        title = QLabel(_t("Personnaliser l'overlay"), self)
         title.setStyleSheet("font-size: 15pt; font-weight: 600;")
         outer.addWidget(title)
 
         subtitle = QLabel(
-            "Les couleurs, la police et la mise en forme sont appliquées à "
-            "l'overlay et enregistrées dans le fichier de configuration.",
+            _t(
+                "Les couleurs, la police et la mise en forme sont appliquées à "
+                "l'overlay et enregistrées dans le fichier de configuration."
+            ),
             self,
         )
         subtitle.setWordWrap(True)
         outer.addWidget(subtitle)
 
-        colors_group = QGroupBox("Couleurs", self)
+        colors_group = QGroupBox(_t("Couleurs"), self)
         grid = QGridLayout(colors_group)
         grid.setHorizontalSpacing(10)
         grid.setVerticalSpacing(8)
@@ -2312,7 +2466,7 @@ class AppearanceDialog(QDialog):
             column = index % 3
             cell = QVBoxLayout()
             cell.setSpacing(4)
-            cell.addWidget(QLabel(label, colors_group))
+            cell.addWidget(QLabel(_t(label), colors_group))
             button = ColorButton(_config_color(config, key), colors_group)
             cell.addWidget(button)
             grid.addLayout(cell, row, column)
@@ -2321,20 +2475,20 @@ class AppearanceDialog(QDialog):
             grid.setColumnStretch(column, 1)
         outer.addWidget(colors_group)
 
-        form_group = QGroupBox("Mise en forme", self)
+        form_group = QGroupBox(_t("Mise en forme"), self)
         form = QFormLayout(form_group)
         form.setHorizontalSpacing(14)
         form.setVerticalSpacing(8)
 
         self.font_combo = QFontComboBox(form_group)
         self.font_combo.setCurrentFont(QFont(font_family))
-        form.addRow("Police", self.font_combo)
+        form.addRow(_t("Police"), self.font_combo)
 
         self.font_size = QSpinBox(form_group)
         self.font_size.setRange(9, 40)
         self.font_size.setSuffix(" pt")
         self.font_size.setValue(config.font_size)
-        form.addRow("Taille", self.font_size)
+        form.addRow(_t("Taille"), self.font_size)
 
         opacity_row = QHBoxLayout()
         self.opacity_slider = QSlider(Qt.Orientation.Horizontal, form_group)
@@ -2345,29 +2499,47 @@ class AppearanceDialog(QDialog):
         self.opacity_label.setMinimumWidth(46)
         opacity_row.addWidget(self.opacity_slider, 1)
         opacity_row.addWidget(self.opacity_label)
-        form.addRow("Opacité", opacity_row)
+        form.addRow(_t("Opacité"), opacity_row)
 
         self.corner_radius = QSpinBox(form_group)
         self.corner_radius.setRange(0, 40)
         self.corner_radius.setSuffix(" px")
         self.corner_radius.setValue(config.corner_radius)
-        form.addRow("Coins arrondis", self.corner_radius)
+        form.addRow(_t("Coins arrondis"), self.corner_radius)
 
         self.margin = QSpinBox(form_group)
         self.margin.setRange(0, 400)
         self.margin.setSuffix(" px")
         self.margin.setValue(config.margin)
-        form.addRow("Marge écran", self.margin)
+        form.addRow(_t("Marge écran"), self.margin)
 
         self.max_width = QSpinBox(form_group)
         self.max_width.setRange(220, 1600)
         self.max_width.setSingleStep(10)
         self.max_width.setSuffix(" px")
         self.max_width.setValue(config.max_width)
-        form.addRow("Largeur maximale", self.max_width)
+        form.addRow(_t("Largeur maximale"), self.max_width)
         outer.addWidget(form_group)
 
-        preview_group = QGroupBox("Aperçu", self)
+        interface_group = QGroupBox(_t("Interface"), self)
+        interface_form = QFormLayout(interface_group)
+        interface_form.setHorizontalSpacing(14)
+        interface_form.setVerticalSpacing(8)
+        self.language_combo = QComboBox(interface_group)
+        for value, label in (
+            (LANGUAGE_AUTO, _t("Automatique (système)")),
+            ("fr", "Français"),
+            ("en", "English"),
+        ):
+            self.language_combo.addItem(label, value)
+        index = self.language_combo.findData(
+            str(config.language).strip().lower()
+        )
+        self.language_combo.setCurrentIndex(index if index >= 0 else 0)
+        interface_form.addRow(_t("Langue"), self.language_combo)
+        outer.addWidget(interface_group)
+
+        preview_group = QGroupBox(_t("Aperçu"), self)
         preview_layout = QVBoxLayout(preview_group)
         preview_layout.setContentsMargins(10, 10, 10, 10)
         self.preview = PreviewPanel(config, font_family)
@@ -2384,12 +2556,12 @@ class AppearanceDialog(QDialog):
             | QDialogButtonBox.StandardButton.Cancel,
             self,
         )
-        buttons.button(QDialogButtonBox.StandardButton.Save).setText("Enregistrer")
-        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText("Annuler")
+        buttons.button(QDialogButtonBox.StandardButton.Save).setText(_t("Enregistrer"))
+        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText(_t("Annuler"))
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
-        reset = QPushButton("Réinitialiser", self)
+        reset = QPushButton(_t("Réinitialiser"), self)
         bottom = QHBoxLayout()
         bottom.addWidget(reset)
         bottom.addStretch(1)
@@ -2424,6 +2596,7 @@ class AppearanceDialog(QDialog):
         if not family:
             family = self._base_config.font_family
         payload: dict[str, object] = {
+            "language": self.language_combo.currentData() or LANGUAGE_AUTO,
             "opacity": self.opacity_slider.value() / 100.0,
             "font_family": family,
             "font_size": self.font_size.value(),
@@ -2462,6 +2635,8 @@ class AppearanceDialog(QDialog):
             self.corner_radius.setValue(defaults.corner_radius)
             self.margin.setValue(defaults.margin)
             self.max_width.setValue(defaults.max_width)
+            index = self.language_combo.findData(defaults.language)
+            self.language_combo.setCurrentIndex(index if index >= 0 else 0)
         finally:
             self._updating = False
         self._refresh_preview()
@@ -2559,36 +2734,19 @@ class TrayController(QObject):
         self.tray.setToolTip(self._tooltip())
         self.menu = QMenu()
 
-        toggle_hint = describe_hotkey(config, config.hotkey_toggle)
-        click_hint = describe_hotkey(config, config.hotkey_click_through)
-        mask_hint = describe_hotkey(config, config.hotkey_masking)
-        quit_hint = describe_hotkey(config, config.hotkey_quit)
-
-        self.act_visible = QAction(
-            f"Afficher l'overlay{'   ' + toggle_hint if toggle_hint else ''}",
-            self,
-        )
+        self.act_visible = QAction("", self)
         self.act_visible.setCheckable(True)
         self.act_visible.triggered.connect(self._overlay.toggle_visible)
 
-        self.act_click_through = QAction(
-            f"Clics traversants{'   ' + click_hint if click_hint else ''}",
-            self,
-        )
+        self.act_click_through = QAction("", self)
         self.act_click_through.setCheckable(True)
         self.act_click_through.triggered.connect(self._overlay.toggle_click_through)
 
-        self.act_masking = QAction(
-            f"Masquer les frappes{'   ' + mask_hint if mask_hint else ''}",
-            self,
-        )
+        self.act_masking = QAction("", self)
         self.act_masking.setCheckable(True)
         self.act_masking.triggered.connect(self._overlay.toggle_masking)
 
-        self.act_quit = QAction(
-            f"Quitter{'   ' + quit_hint if quit_hint else ''}",
-            self,
-        )
+        self.act_quit = QAction("", self)
         self.act_quit.triggered.connect(app.quit)
 
         self.menu.addAction(self.act_visible)
@@ -2596,16 +2754,16 @@ class TrayController(QObject):
         self.menu.addAction(self.act_masking)
         self.menu.addSeparator()
 
-        self.act_appearance = QAction("Personnaliser l'overlay…", self)
+        self.act_appearance = QAction("", self)
         self.act_appearance.triggered.connect(self._overlay.edit_appearance)
         self.menu.addAction(self.act_appearance)
 
-        self.position_menu = self.menu.addMenu("Position de l'overlay")
+        self.position_menu = self.menu.addMenu("")
         self.position_group = QActionGroup(self)
         self.position_group.setExclusive(True)
         self.position_actions: dict[str, QAction] = {}
         for position in POSITION_CHOICES:
-            action = QAction(POSITION_LABELS[position], self)
+            action = QAction("", self)
             action.setCheckable(True)
             action.triggered.connect(
                 lambda _checked=False, chosen=position: self._overlay.set_position(
@@ -2623,6 +2781,7 @@ class TrayController(QObject):
         self.tray.activated.connect(self._on_activated)
         self._overlay.state_changed.connect(self.sync_actions)
 
+        self.retranslate()
         self.sync_actions()
 
     # ------------------------------------------------------------------
@@ -2632,17 +2791,48 @@ class TrayController(QObject):
     def hide(self) -> None:
         self.tray.hide()
 
+    def retranslate(self) -> None:
+        """Applique la langue courante aux textes du menu."""
+        toggle_hint = describe_hotkey(self._cfg, self._cfg.hotkey_toggle)
+        click_hint = describe_hotkey(self._cfg, self._cfg.hotkey_click_through)
+        mask_hint = describe_hotkey(self._cfg, self._cfg.hotkey_masking)
+        quit_hint = describe_hotkey(self._cfg, self._cfg.hotkey_quit)
+
+        self.act_visible.setText(
+            _t("Afficher l'overlay")
+            + ("   " + toggle_hint if toggle_hint else "")
+        )
+        self.act_click_through.setText(
+            _t("Clics traversants")
+            + ("   " + click_hint if click_hint else "")
+        )
+        self.act_masking.setText(
+            _t("Masquer les frappes") + ("   " + mask_hint if mask_hint else "")
+        )
+        self.act_quit.setText(
+            _t("Quitter") + ("   " + quit_hint if quit_hint else "")
+        )
+        self.act_appearance.setText(_t("Personnaliser l'overlay…"))
+        self.position_menu.setTitle(_t("Position de l'overlay"))
+        for position, action in self.position_actions.items():
+            action.setText(_t(POSITION_LABELS[position]))
+        self.tray.setToolTip(self._tooltip())
+
     def _tooltip(self) -> str:
         hints = []
         for label, spec in (
-            ("Afficher/masquer", self._cfg.hotkey_toggle),
-            ("Clics traversants", self._cfg.hotkey_click_through),
-            ("Masquer les frappes", self._cfg.hotkey_masking),
-            ("Quitter", self._cfg.hotkey_quit),
+            (_t("Afficher/masquer"), self._cfg.hotkey_toggle),
+            (_t("Clics traversants"), self._cfg.hotkey_click_through),
+            (_t("Masquer les frappes"), self._cfg.hotkey_masking),
+            (_t("Quitter"), self._cfg.hotkey_quit),
         ):
             description = describe_hotkey(self._cfg, spec)
             if description:
-                hints.append(f"{label} : {description}")
+                hints.append(
+                    _t("{label} : {shortcut}").format(
+                        label=label, shortcut=description
+                    )
+                )
         return f"{APP_NAME}\n" + "\n".join(hints)
 
     def sync_actions(self) -> None:
@@ -2676,55 +2866,95 @@ def _default_config_path() -> Path:
     return Path(__file__).resolve().parent / "config.json"
 
 
+def _language_argument(arguments: Iterable[str]) -> str:
+    """Lit ``--lang`` sans construire le parseur (pour traduire l'aide)."""
+    options = list(arguments)
+    for index, argument in enumerate(options):
+        if argument == "--lang" and index + 1 < len(options):
+            return options[index + 1]
+        if argument.startswith("--lang="):
+            return argument.split("=", 1)[1]
+    return LANGUAGE_AUTO
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pressvisual",
-        description=(
+        description=_t(
             "Overlay de visualisation des frappes clavier et des clics souris, "
             "pour les captures d'écran et tutoriels."
         ),
     )
-    parser.add_argument("--config", metavar="FICHIER", help="fichier JSON de configuration")
-    parser.add_argument("--duration", type=float, help="durée affichée après la dernière entrée (s)")
-    parser.add_argument("--opacity", type=float, help="opacité du fond (0.15 - 1.0)")
-    parser.add_argument("--font-size", type=int, help="taille de police (pt)")
-    parser.add_argument("--max-rows", type=int, help="nombre de lignes conservées")
-    parser.add_argument("--max-width", type=int, help="largeur maximale du contenu (px)")
-    parser.add_argument("--margin", type=int, help="marge avec le bord de l'écran (px)")
+    parser.add_argument(
+        "--config",
+        metavar=_t("FICHIER"),
+        help=_t("fichier JSON de configuration"),
+    )
+    parser.add_argument(
+        "--lang",
+        choices=(LANGUAGE_AUTO, *SUPPORTED_LANGUAGES),
+        help=_t("langue de l'interface : auto (système), fr ou en"),
+    )
+    parser.add_argument(
+        "--duration",
+        type=float,
+        help=_t("durée affichée après la dernière entrée (s)"),
+    )
+    parser.add_argument(
+        "--opacity", type=float, help=_t("opacité du fond (0.15 - 1.0)")
+    )
+    parser.add_argument("--font-size", type=int, help=_t("taille de police (pt)"))
+    parser.add_argument(
+        "--max-rows", type=int, help=_t("nombre de lignes conservées")
+    )
+    parser.add_argument(
+        "--max-width", type=int, help=_t("largeur maximale du contenu (px)")
+    )
+    parser.add_argument(
+        "--margin", type=int, help=_t("marge avec le bord de l'écran (px)")
+    )
     parser.add_argument(
         "--position",
         choices=POSITION_CHOICES,
-        help="position initiale : top-left, top-right, bottom-left, bottom-right ou bottom-center",
+        help=_t(
+            "position initiale : top-left, top-right, bottom-left, bottom-right "
+            "ou bottom-center"
+        ),
     )
     parser.add_argument(
         "--no-keyboard",
         action="store_true",
-        help="ne pas afficher les frappes (les raccourcis globaux restent actifs)",
+        help=_t("ne pas afficher les frappes (les raccourcis globaux restent actifs)"),
     )
     parser.add_argument(
         "--no-mouse",
         action="store_true",
-        help="ne pas capturer la souris",
+        help=_t("ne pas capturer la souris"),
     )
     parser.add_argument(
         "--group-text",
         action="store_true",
-        help="regrouper les caractères saisis en texte continu au lieu d'une touche par ligne",
+        help=_t(
+            "regrouper les caractères saisis en texte continu au lieu d'une "
+            "touche par ligne"
+        ),
     )
     parser.add_argument(
         "--start-hidden",
         action="store_true",
-        help="démarrer sans capture (Ctrl+F12 pour l'activer)",
+        help=_t("démarrer sans capture (Ctrl+F12 pour l'activer)"),
     )
     parser.add_argument(
         "--click-through",
         action="store_true",
-        help="démarrer en mode clics traversants",
+        help=_t("démarrer en mode clics traversants"),
     )
     parser.add_argument(
         "--toggle-hotkey",
-        metavar="RACCOURCI",
-        help="raccourci afficher/masquer (ex. ctrl+f12, chaîne vide pour désactiver)",
+        metavar=_t("RACCOURCI"),
+        help=_t(
+            "raccourci afficher/masquer (ex. ctrl+f12, chaîne vide pour désactiver)"
+        ),
     )
     return parser
 
@@ -2735,8 +2965,26 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
+    arguments = list(sys.argv[1:] if argv is None else argv)
+
+    existing = QApplication.instance()
+    app = (
+        existing
+        if isinstance(existing, QApplication)
+        else QApplication(sys.argv[:1])
+    )
+    app.setApplicationName(APP_NAME)
+    app.setApplicationDisplayName(APP_NAME)
+    app.setQuitOnLastWindowClosed(False)
+    app.setWindowIcon(build_app_icon())
+
+    # La langue est choisie avant de construire le parseur : l'aide de
+    # --help s'affiche ainsi dans la langue demandée (--lang ou système).
+    language = resolve_language(_language_argument(arguments))
+    translator = install_translator(app, language)
+
     parser = build_arg_parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_args(arguments)
 
     def warn(message: str) -> None:
         sys.stderr.write(f"[{APP_NAME}] {message}\n")
@@ -2774,18 +3022,20 @@ def main(argv: Optional[list[str]] = None) -> int:
         config.click_through_on_start = True
     if args.toggle_hotkey is not None:
         config.hotkey_toggle = args.toggle_hotkey
+    if args.lang is not None:
+        config.language = args.lang
+
+    # Le fichier de configuration peut imposer une autre langue que --lang.
+    wanted = resolve_language(config.language)
+    if wanted != language:
+        translator = install_translator(app, wanted, translator)
+        language = wanted
 
     for note in config.validate():
         warn(note)
 
     if not config.capture_keyboard and not config.capture_mouse:
-        warn("Clavier et souris sont désactivés : l'overlay ne montrera rien.")
-
-    app = QApplication(sys.argv[:1])
-    app.setApplicationName(APP_NAME)
-    app.setApplicationDisplayName(APP_NAME)
-    app.setQuitOnLastWindowClosed(False)
-    app.setWindowIcon(build_app_icon())
+        warn(_t("Clavier et souris sont désactivés : l'overlay ne montrera rien."))
 
     overlay = Overlay(config)
 
@@ -2800,7 +3050,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         parsed = parse_hotkey(spec)
         if parsed is None:
             if spec:
-                warn(f"Raccourci global invalide ignoré : {spec!r}")
+                warn(
+                    _t("Raccourci global invalide ignoré : {spec}").format(
+                        spec=repr(spec)
+                    )
+                )
             continue
         hotkeys[parsed] = action
 
@@ -2825,17 +3079,29 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     def show_error(message: str) -> None:
         warn(message)
-        QMessageBox.critical(None, f"{APP_NAME} — erreur de capture", message)
+        QMessageBox.critical(
+            None, f"{APP_NAME} — {_t('erreur de capture')}", message
+        )
 
     bridge.error.connect(show_error)
 
     tray = TrayController(app, overlay, config)
+
+    def change_language(chosen: str) -> None:
+        """Applique le choix de langue de la fenêtre d'apparence."""
+        nonlocal translator
+        translator = apply_language_change(app, tray, translator, chosen)
+
+    overlay.language_changed.connect(change_language)
+
     if QSystemTrayIcon.isSystemTrayAvailable():
         tray.show()
     else:
         warn(
-            "Aucune zone de notification disponible : utilisez les raccourcis "
-            "globaux ou Ctrl+C dans le terminal pour quitter."
+            _t(
+                "Aucune zone de notification disponible : utilisez les raccourcis "
+                "globaux ou Ctrl+C dans le terminal pour quitter."
+            )
         )
 
     def shutdown() -> None:
