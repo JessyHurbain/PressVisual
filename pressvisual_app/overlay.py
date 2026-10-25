@@ -239,6 +239,7 @@ class Overlay(QWidget):
                 event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             )
             self._dragging = True
+            self._hold_visible()
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
             self.update()
             event.accept()
@@ -260,9 +261,24 @@ class Overlay(QWidget):
             self.update()
             # Rattrape un éventuel changement de contenu pendant le glisser.
             self._relayout()
+            # La bulle reste affichée un délai complet après avoir été posée.
+            self._bump()
             event.accept()
             return
         super().mouseReleaseEvent(event)
+
+    def _hold_visible(self) -> None:
+        """Empêche la bulle de s'effacer pendant un déplacement manuel.
+
+        Le minuteur de disparition est suspendu tant que le bouton reste
+        enfoncé, et un fondu déjà commencé est annulé.
+        """
+        self._idle_timer.stop()
+        if self._fade_target != "out":
+            return
+        self._fade.stop()
+        self._fade_target = "idle"
+        self.setWindowOpacity(1.0)
 
     def _snap_anchor_to_position(self) -> None:
         """Conserve les bords proches du centre de l'écran après un glisser.

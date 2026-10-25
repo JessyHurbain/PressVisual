@@ -5,7 +5,8 @@ from __future__ import annotations
 import time
 
 import pytest
-from PyQt6.QtGui import QGuiApplication
+from PyQt6.QtCore import QAbstractAnimation, QEvent, QPoint, QPointF, Qt
+from PyQt6.QtGui import QGuiApplication, QMouseEvent
 
 import pressvisual
 from pressvisual import KeyEvent, MouseEvent
@@ -392,6 +393,87 @@ def test_hidden_overlay_does_not_move_on_relayout(overlay):
     overlay._relayout()
 
     assert overlay.pos() == before
+
+
+# ---------------------------------------------------------------------------
+# Déplacement manuel
+# ---------------------------------------------------------------------------
+
+
+def _mouse(kind, overlay, global_pos, buttons=Qt.MouseButton.LeftButton):
+    local = QPointF(global_pos - overlay.frameGeometry().topLeft())
+    return QMouseEvent(
+        kind,
+        local,
+        QPointF(global_pos),
+        Qt.MouseButton.LeftButton,
+        buttons,
+        Qt.KeyboardModifier.NoModifier,
+    )
+
+
+def _drag(overlay, delta: QPoint) -> QPoint:
+    """Simule un glisser complet depuis le centre de la bulle."""
+    start = overlay.frameGeometry().center()
+    end = start + delta
+    overlay.mousePressEvent(_mouse(QEvent.Type.MouseButtonPress, overlay, start))
+    overlay.mouseMoveEvent(_mouse(QEvent.Type.MouseMove, overlay, end))
+    overlay.mouseReleaseEvent(
+        _mouse(QEvent.Type.MouseButtonRelease, overlay, end, Qt.MouseButton.NoButton)
+    )
+    return end
+
+
+def test_press_suspends_the_hide_timer(overlay):
+    overlay.show()
+    overlay._on_key(KeyEvent(token="a", char="a"))
+    assert overlay._idle_timer.isActive()
+
+    start = overlay.frameGeometry().center()
+    overlay.mousePressEvent(_mouse(QEvent.Type.MouseButtonPress, overlay, start))
+
+    assert overlay._dragging is True
+    assert not overlay._idle_timer.isActive()
+    overlay.mouseReleaseEvent(
+        _mouse(QEvent.Type.MouseButtonRelease, overlay, start, Qt.MouseButton.NoButton)
+    )
+
+
+def test_press_cancels_a_running_fade_out(overlay):
+    overlay.show()
+    overlay._fade_out()
+    assert overlay._fade_target == "out"
+
+    overlay.mousePressEvent(
+        _mouse(QEvent.Type.MouseButtonPress, overlay, overlay.frameGeometry().center())
+    )
+
+    assert overlay._fade_target == "idle"
+    assert overlay._fade.state() == QAbstractAnimation.State.Stopped
+    assert overlay.isVisible()
+
+
+def test_release_restarts_the_hide_timer(overlay):
+    overlay.show()
+    overlay._idle_timer.stop()
+
+    end = _drag(overlay, QPoint(-120, -80))
+
+    assert overlay._dragging is False
+    assert overlay._idle_timer.isActive()
+    assert overlay.isVisible()
+    assert overlay.frameGeometry().center() != end, "la bulle doit avoir bougé"
+
+
+def test_drag_outside_the_screen_is_clamped_back_inside(overlay):
+    overlay.show()
+    available = QGuiApplication.primaryScreen().availableGeometry()
+
+    # Glisser très au-delà du coin haut-gauche de l'écran.
+    _drag(overlay, QPoint(-available.left() - 400, -available.top() - 400))
+
+    assert overlay.x() >= available.left()
+    assert overlay.y() >= available.top()
 
 
 # ---------------------------------------------------------------------------

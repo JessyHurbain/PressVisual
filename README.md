@@ -181,7 +181,11 @@ La bulle se place sur l'écran où se trouve le curseur, à la distance `margin`
 des bords. Elle peut aussi être déplacée librement au clic-glisser ; après un
 déplacement, PressVisual conserve les bords les plus proches du centre de
 l'écran, de sorte que la bulle grandisse vers le centre au fil des frappes au
-lieu de sortir par un bord.
+lieu de sortir par un bord. Pendant le glisser, la disparition automatique est
+suspendue et un fondu déjà commencé est annulé : la bulle ne s'efface pas sous
+la main. Une fois posée, elle reste affichée un délai complet
+(`display_duration`) avant de s'effacer. Un dépôt hors de l'écran est ramené
+dans la zone visible.
 
 Le coin choisi dans le sous-menu est **mémorisé automatiquement** dans
 `config.json` : PressVisual s'ouvre au même endroit au prochain lancement. Un
