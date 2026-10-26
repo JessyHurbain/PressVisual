@@ -681,19 +681,19 @@ class Overlay(QWidget):
         """Durée de la transition de disparition, en millisecondes."""
         if self._cfg.transition == "none":
             return 0
-        return max(0, int(self._cfg.fade_out_ms))
+        return max(0, int(self._cfg.transition_out_ms))
 
     def _entry_duration(self) -> int:
         """Durée de l'apparition.
 
-        Elle reprend la même transition mais reste brève (``fade_in_ms``)
+        Elle reprend la même transition mais reste brève (``transition_in_ms``)
         pour qu'une frappe allume la bulle sans délai perceptible ; une
         durée de disparition plus courte s'applique telle quelle.
         """
         duration = self._transition_duration()
         if duration <= 0:
             return 0
-        return min(max(0, int(self._cfg.fade_in_ms)), duration)
+        return min(max(0, int(self._cfg.transition_in_ms)), duration)
 
     def _fade_in(self) -> None:
         """Affiche la bulle avec la transition d'apparition choisie."""

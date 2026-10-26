@@ -302,7 +302,7 @@ lieu de sortir par un bord. Pendant le glisser, la disparition automatique est
 suspendue et un fondu déjà commencé est annulé : la bulle ne s'efface pas sous
 la main. Une fois posée, elle reste affichée un délai complet
 (`display_duration`) avant de s'effacer — en fondu, en glissement, en zoom ou
-d'un coup, selon `transition` et sa durée `fade_out_ms`. Un dépôt hors de
+d'un coup, selon `transition` et sa durée `transition_out_ms`. Un dépôt hors de
 l'écran est ramené dans la zone visible.
 
 Le coin choisi dans le sous-menu est **mémorisé automatiquement** dans
@@ -335,17 +335,18 @@ grossit de la même façon en apparaissant.
 - **Aucune** (`"none"`) : la bulle s'affiche et disparaît immédiatement,
 sans animation.
 
-La durée de la disparition va de 0 à 3000 ms (`fade_out_ms`) ; à 0, la bulle
+La durée de la disparition va de 0 à 3000 ms (`transition_out_ms`) ; à 0, la bulle
 part d'un coup quelle que soit la transition. L'apparition reprend la même
-transition sur `fade_in_ms` (120 ms par défaut), ou sur `fade_out_ms` s'il est
-plus court, pour qu'une frappe allume la bulle sans délai. Une frappe pendant
-la disparition rappelle la bulle à sa place, sans la laisser à moitié sortie.
+transition sur `transition_in_ms` (120 ms par défaut), ou sur
+`transition_out_ms` s'il est plus court, pour qu'une frappe allume la bulle
+sans délai. Une frappe pendant la disparition rappelle la bulle à sa place,
+sans la laisser à moitié sortie.
 
 La fenêtre de personnalisation rejoue la transition en boucle dans son
 **Aperçu** : la bulle sort puis revient à la cadence choisie, ce qui permet de
 comparer les styles et d'ajuster la durée sans quitter les réglages.
 
-![Glissement vers le bas : la bulle sort par le bas sur fade_out_ms](docs/images/transition-slide.png)
+![Glissement vers le bas : la bulle sort par le bas sur transition_out_ms](docs/images/transition-slide.png)
 
 ### Mode clavier complet
 
@@ -405,9 +406,9 @@ fenêtre de réglages avec un aperçu en direct :
   (touche `A`, puis `Maj + E` avec un clic droit et un cran de molette), dans
   le mode choisi, pour juger du rendu sans rien taper soi-même. La bulle
   disparaît et revient ensuite avec la transition sélectionnée, sur sa durée
-  réelle (la disparition sur `fade_out_ms`, le retour sur `fade_in_ms`) :
-  glissements, zoom et fondu se voient donc avant d'enregistrer, et chaque
-  changement de réglage relance la démonstration.
+  réelle (la disparition sur `transition_out_ms`, le retour sur
+  `transition_in_ms`) : glissements, zoom et fondu se voient donc avant
+  d'enregistrer, et chaque changement de réglage relance la démonstration.
 - **Réinitialiser** restaure les valeurs d'origine, **Annuler** ferme sans rien
   changer et **Enregistrer** applique les réglages immédiatement puis les écrit
   dans le fichier de configuration.
@@ -489,9 +490,9 @@ Le dossier qui contient le fichier doit donc être accessible en écriture.
 ```json
 {
   "display_duration": 2.0,
-  "fade_in_ms": 120,
+  "transition_in_ms": 120,
   "transition": "fade",
-  "fade_out_ms": 420,
+  "transition_out_ms": 420,
   "opacity": 0.86,
   "font_family": "",
   "font_size": 16,
@@ -549,12 +550,18 @@ Le dossier qui contient le fichier doit donc être accessible en écriture.
 
 ### Détail des clés
 
+Les durées s'appelaient `fade_in_ms` et `fade_out_ms` avant que les transitions
+dépassent le simple fondu. Ces deux noms restent lus dans un `config.json`
+existant, reportés sous leur nouveau nom, puis supprimés du fichier au prochain
+enregistrement : rien à réécrire à la main, et la clé actuelle l'emporte si les
+deux formes cohabitent.
+
 | Clé | Rôle |
 | --- | --- |
 | `display_duration` | Secondes de maintien après la dernière entrée (0,3 à 30). |
-| `fade_in_ms` | Durée de la transition d'apparition (0 à 2000 ms). |
+| `transition_in_ms` | Durée de la transition d'apparition (0 à 2000 ms). |
 | `transition` | Transition de la bulle, à l'apparition comme à la disparition : `fade` (fondu), `slide` / `slide-up` / `slide-left` / `slide-right` (glissements), `zoom` ou `none` (immédiate). |
-| `fade_out_ms` | Durée de la transition de disparition (0 à 3000 ms) ; plafonne aussi l'apparition. |
+| `transition_out_ms` | Durée de la transition de disparition (0 à 3000 ms) ; plafonne aussi l'apparition. |
 | `opacity` | Opacité du fond de l'overlay (0.15 à 1.0). |
 | `font_family` | Police ; vide = sélection automatique (Segoe UI, SF Pro, Inter…). |
 | `font_size` | Taille de police en points. |

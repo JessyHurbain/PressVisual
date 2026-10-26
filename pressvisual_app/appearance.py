@@ -431,13 +431,13 @@ class PreviewPanel(QWidget):
     def _exit_duration(self) -> int:
         if self._transition_style() == "none":
             return 0
-        return max(0, int(self._config.fade_out_ms))
+        return max(0, int(self._config.transition_out_ms))
 
     def _entry_duration(self) -> int:
         duration = self._exit_duration()
         if duration <= 0:
             return 0
-        return min(max(0, int(self._config.fade_in_ms)), duration)
+        return min(max(0, int(self._config.transition_in_ms)), duration)
 
     def hideEvent(self, event) -> None:  # noqa: N802 - API Qt
         """Suspend les animations quand l'aperçu n'est plus visible."""
@@ -714,7 +714,7 @@ class AppearanceDialog(QDialog):
         self.transition_duration.setRange(0, 3000)
         self.transition_duration.setSingleStep(50)
         self.transition_duration.setSuffix(" ms")
-        self.transition_duration.setValue(int(config.fade_out_ms))
+        self.transition_duration.setValue(int(config.transition_out_ms))
         display_form.addRow(_t("Durée de la disparition"), self.transition_duration)
         outer.addWidget(display_group)
 
@@ -803,7 +803,7 @@ class AppearanceDialog(QDialog):
             "keyboard_layout": self.layout_combo.currentData() or "azerty",
             "show_mouse": self.show_mouse.isChecked(),
             "transition": self.transition_combo.currentData() or "fade",
-            "fade_out_ms": self.transition_duration.value(),
+            "transition_out_ms": self.transition_duration.value(),
             "opacity": self.opacity_slider.value() / 100.0,
             "font_family": family,
             "font_size": self.font_size.value(),
@@ -851,7 +851,7 @@ class AppearanceDialog(QDialog):
             self.show_mouse.setChecked(defaults.show_mouse)
             index = self.transition_combo.findData(defaults.transition)
             self.transition_combo.setCurrentIndex(index if index >= 0 else 0)
-            self.transition_duration.setValue(int(defaults.fade_out_ms))
+            self.transition_duration.setValue(int(defaults.transition_out_ms))
         finally:
             self._updating = False
         self._refresh_preview()

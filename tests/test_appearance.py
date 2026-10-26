@@ -480,7 +480,7 @@ def test_preview_freezes_the_bubble_without_the_checkerboard(qapp, config):
 
 def test_preview_plays_the_transition_and_returns(qapp, config):
     config.transition = "slide"
-    config.fade_out_ms = 200
+    config.transition_out_ms = 200
     dialog = make_dialog(qapp, config)
     try:
         preview = dialog.preview
@@ -527,7 +527,7 @@ def test_preview_none_transition_hides_at_once(qapp, config):
 
 def test_preview_follows_the_chosen_duration(qapp, config):
     config.transition = "zoom"
-    config.fade_out_ms = 900
+    config.transition_out_ms = 900
     dialog = make_dialog(qapp, config)
     try:
         preview = dialog.preview
@@ -559,7 +559,7 @@ def test_changing_the_transition_restarts_the_preview(qapp, config):
 
 def test_preview_cycle_hides_then_brings_the_bubble_back(qapp, config):
     config.transition = "fade"
-    config.fade_out_ms = 120
+    config.transition_out_ms = 120
     dialog = make_dialog(qapp, config)
     try:
         preview = dialog.preview

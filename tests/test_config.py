@@ -32,6 +32,56 @@ def test_load_missing_file_keeps_defaults(tmp_path):
     assert config.position == "bottom-right"
 
 
+def test_load_accepts_the_old_transition_keys(tmp_path):
+    """Un fichier écrit avant le renommage reste lisible, sans avertissement."""
+    path = tmp_path / "config.json"
+    write_json(path, {"fade_in_ms": 250, "fade_out_ms": 800})
+    warnings: list[str] = []
+
+    config = pressvisual.Config.load(path, warnings.append)
+    config.validate()
+
+    assert warnings == []
+    assert config.transition_in_ms == 250
+    assert config.transition_out_ms == 800
+
+
+def test_load_prefers_the_current_key_over_the_old_one(tmp_path):
+    path = tmp_path / "config.json"
+    write_json(path, {"fade_out_ms": 800, "transition_out_ms": 300})
+
+    config = pressvisual.Config.load(path, lambda _message: None)
+
+    assert config.transition_out_ms == 300
+
+
+def test_saving_replaces_the_old_keys(tmp_path):
+    path = tmp_path / "config.json"
+    write_json(
+        path, {"fade_in_ms": 250, "fade_out_ms": 800, "position": "top-left"}
+    )
+    config = pressvisual.Config.load(path, lambda _message: None)
+
+    assert config.save_appearance({"transition_out_ms": 640})
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["transition_out_ms"] == 640
+    assert "fade_out_ms" not in data
+    assert "fade_in_ms" not in data
+    # Les autres réglages du fichier restent intacts.
+    assert data["position"] == "top-left"
+
+
+def test_saving_cleans_a_file_holding_both_key_names(tmp_path):
+    path = tmp_path / "config.json"
+    write_json(path, {"transition_out_ms": 800, "fade_out_ms": 800})
+    config = pressvisual.Config.load(path, lambda _message: None)
+
+    assert config.save_appearance({"transition_out_ms": 800})
+
+    assert json.loads(path.read_text(encoding="utf-8")) == {"transition_out_ms": 800}
+
+
 def test_load_applies_keys_and_signals_unknown_ones(tmp_path):
     path = tmp_path / "config.json"
     write_json(path, {"opacity": 0.5, "font_family": "Inter", "inconnue": 1})

@@ -36,7 +36,7 @@ def close_overlay(overlay, qapp) -> None:
 
 def make_config(config, transition: str, duration: int = 300):
     config.transition = transition
-    config.fade_out_ms = duration
+    config.transition_out_ms = duration
     config.validate()
     return config
 
@@ -143,25 +143,25 @@ def test_transition_settings_are_saved(tmp_path):
     path = tmp_path / "config.json"
     config = pressvisual.Config.load(path, lambda _message: None)
     config.transition = "slide"
-    config.fade_out_ms = 750
+    config.transition_out_ms = 750
 
-    assert config.save_appearance({"transition": "slide", "fade_out_ms": 750})
+    assert config.save_appearance({"transition": "slide", "transition_out_ms": 750})
 
     data = json.loads(path.read_text(encoding="utf-8"))
     assert data["transition"] == "slide"
-    assert data["fade_out_ms"] == 750
+    assert data["transition_out_ms"] == 750
 
     reloaded = pressvisual.Config.load(path, lambda _message: None)
     assert reloaded.transition == "slide"
-    assert reloaded.fade_out_ms == 750
+    assert reloaded.transition_out_ms == 750
 
 
 def test_duration_is_bounded():
-    config = pressvisual.Config(fade_out_ms=9000)
+    config = pressvisual.Config(transition_out_ms=9000)
 
     assert config.validate()
 
-    assert config.fade_out_ms == 3000
+    assert config.transition_out_ms == 3000
 
 
 # ---------------------------------------------------------------------------
@@ -406,7 +406,7 @@ def test_entry_grows_the_overlay_on_zoom(qapp, config):
 
 def test_entry_animation_is_capped_by_the_exit_duration(qapp, config):
     make_config(config, "fade", 60)
-    config.fade_in_ms = 400
+    config.transition_in_ms = 400
     config.display_mode = "keyboard"
     config.validate()
     overlay = pressvisual.Overlay(config)
@@ -501,7 +501,7 @@ def test_dialog_exposes_the_transition_choices(qapp, config):
 
 def test_dialog_values_carry_the_transition(qapp, config):
     config.transition = "slide"
-    config.fade_out_ms = 640
+    config.transition_out_ms = 640
     dialog = pressvisual.AppearanceDialog(config, "DejaVu Sans")
     try:
         assert dialog.transition_combo.currentData() == "slide"
@@ -514,19 +514,19 @@ def test_dialog_values_carry_the_transition(qapp, config):
 
         values = dialog.values()
         assert values["transition"] == "none"
-        assert values["fade_out_ms"] == 120
+        assert values["transition_out_ms"] == 120
     finally:
         dialog.deleteLater()
 
 
 def test_reset_restores_the_default_transition(qapp, config):
     config.transition = "none"
-    config.fade_out_ms = 1500
+    config.transition_out_ms = 1500
     dialog = pressvisual.AppearanceDialog(config, "DejaVu Sans")
     try:
         dialog._reset()
 
         assert dialog.transition_combo.currentData() == "fade"
-        assert dialog.transition_duration.value() == pressvisual.Config().fade_out_ms
+        assert dialog.transition_duration.value() == pressvisual.Config().transition_out_ms
     finally:
         dialog.deleteLater()

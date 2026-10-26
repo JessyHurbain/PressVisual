@@ -49,8 +49,16 @@ APPEARANCE_CONFIG_KEYS: tuple[str, ...] = (
     "keyboard_layout",
     "show_mouse",
     "transition",
-    "fade_out_ms",
+    "transition_out_ms",
 )
+
+#: Anciens noms de clés, encore lus depuis un fichier existant. La valeur est
+#: reportée sous son nom actuel, et l'ancienne clé disparaît au prochain
+#: enregistrement : aucun utilisateur n'a à réécrire sa configuration.
+RENAMED_CONFIG_KEYS: dict[str, str] = {
+    "fade_in_ms": "transition_in_ms",
+    "fade_out_ms": "transition_out_ms",
+}
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -66,8 +74,8 @@ class Config:
 
     # --- Affichage ---------------------------------------------------------
     display_duration: float = 2.0      # durée de maintien à l'écran (s)
-    fade_in_ms: int = 120              # durée du fondu d'apparition (ms)
-    fade_out_ms: int = 420             # durée du fondu de disparition (ms)
+    transition_in_ms: int = 120        # durée de l'apparition (ms)
+    transition_out_ms: int = 420       # durée de la disparition (ms)
     opacity: float = 0.86              # opacité du fond (0.15 - 1.0)
     font_family: str = ""              # vide = police système automatique
     font_size: int = 16
@@ -161,17 +169,23 @@ class Config:
                 )
             )
             return config
-        for key, value in raw.items():
-            if key == "path":
+        # Les anciens noms passent d'abord : si un fichier contient les deux
+        # formes, la clé actuelle l'emporte.
+        ordered = [key for key in raw if key in RENAMED_CONFIG_KEYS]
+        ordered += [key for key in raw if key not in RENAMED_CONFIG_KEYS]
+        for key in ordered:
+            value = raw[key]
+            name = RENAMED_CONFIG_KEYS.get(key, key)
+            if name == "path":
                 # Champ interne (emplacement du fichier) : jamais chargé.
                 warn(_t("Clé réservée ignorée : path"))
                 continue
-            if not hasattr(config, key):
+            if not hasattr(config, name):
                 warn(
                     _t("Clé de configuration inconnue ignorée : {key}").format(key=key)
                 )
                 continue
-            setattr(config, key, value)
+            setattr(config, name, value)
         return config
 
     # ------------------------------------------------------------------
@@ -200,8 +214,8 @@ class Config:
             setattr(self, name, converted)
 
         number("display_duration", 0.3, 30.0, float, " s")
-        number("fade_in_ms", 0, 2000, int, " ms")
-        number("fade_out_ms", 0, 3000, int, " ms")
+        number("transition_in_ms", 0, 2000, int, " ms")
+        number("transition_out_ms", 0, 3000, int, " ms")
         number("opacity", 0.15, 1.0, float)
         number("font_size", 9, 40, int, " pt")
         number("max_rows", 1, 8, int)
@@ -383,6 +397,7 @@ class Config:
 
         path = self.path
         data: dict[str, object] = {}
+        deprecated: list[str] = []
         if path.exists():
             try:
                 raw = json.loads(path.read_text(encoding="utf-8"))
@@ -405,12 +420,19 @@ class Config:
                     + "\n"
                 )
                 return False
-            data = raw
+            # Le renommage des clés se fait ici : le fichier est débarrassé
+            # des anciens noms à la première écriture qui suit.
+            deprecated = [key for key in raw if key in RENAMED_CONFIG_KEYS]
+            data = {
+                key: value
+                for key, value in raw.items()
+                if key not in RENAMED_CONFIG_KEYS
+            }
 
         changed = {
             key: value for key, value in values.items() if data.get(key) != value
         }
-        if not changed:
+        if not changed and not deprecated:
             return True
         data.update(changed)
 
