@@ -185,6 +185,8 @@ La suite de tests s'exécute sans ouvrir de fenêtre (greffon Qt `offscreen`) :
 ```bash
 python -m pip install -r requirements-dev.txt
 python -m pytest
+python -m ruff check .          # analyse statique
+python -m pytest --cov          # couverture des modules de pressvisual_app
 ```
 
 Les tests couvrent la configuration (chargement, validation, enregistrement),
@@ -199,6 +201,19 @@ X11 : lancez alors `xvfb-run -a python -m pytest`. C'est ce que fait le workflow
 poussée sur `main` et à chaque pull request. Sa matrice couvre **Linux et
 Windows** avec **Python 3.9 à 3.12**, sous le greffon Qt « offscreen » : aucune
 fenêtre ne s'ouvre, et rien n'est envoyé au vrai clavier ni à la vraie souris.
+
+Une tâche séparée, **Analyse statique et couverture**, s'exécute une seule fois
+(Ubuntu, Python 3.12) et joue deux garde-fous :
+
+- **`ruff`** signale les erreurs réelles, les imports mal ordonnés, les pièges
+  classiques et les simplifications évidentes. Le jeu de règles et la version
+  visée (Python 3.9) sont fixés dans [pyproject.toml](pyproject.toml), pour que
+  le résultat soit identique sur votre machine et dans la CI.
+- **`pytest --cov`** mesure la couverture des modules de `pressvisual_app` :
+  elle est aujourd'hui d'environ **91 %**, avec un plancher à **85 %** qui fait
+  échouer la CI si elle s'effondre. Le seuil est défini par `fail_under` dans
+  [pyproject.toml](pyproject.toml), et `--cov-report=term-missing` indique les
+  lignes non couvertes.
 
 ## Lancement
 
@@ -778,9 +793,10 @@ translations/         Catalogues de traduction (.ts source, .qm compilé)
 tools/                Compilation des .ts en .qm (sans lrelease)
 tests/                Suite de tests hors écran (pytest)
 docs/images/          Captures d'écran utilisées par ce README
-.github/workflows/    Intégration continue (compilation + tests)
+.github/workflows/    Intégration continue (tests, analyse statique, couverture)
 requirements.txt      Dépendances d'exécution
-requirements-dev.txt  Dépendances de développement (pytest)
+requirements-dev.txt  Dépendances de développement (pytest, couverture, ruff)
+pyproject.toml        Règles de ruff et seuil de couverture
 README.md             Ce document
 ```
 

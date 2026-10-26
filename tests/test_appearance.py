@@ -12,7 +12,6 @@ import pressvisual
 from pressvisual_app import appearance as appearance_module
 from pressvisual_app import overlay as overlay_module
 
-
 # ---------------------------------------------------------------------------
 # Palette
 # ---------------------------------------------------------------------------

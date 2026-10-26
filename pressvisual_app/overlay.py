@@ -53,7 +53,7 @@ from .keymap import (
     modifier_label,
     should_use_combo,
 )
-from .mouse import MOUSE_BUTTONS, MOUSE_SCROLL_FLASH_MS
+from .mouse import MOUSE_SCROLL_FLASH_MS
 from .theme import Palette, _with_alpha
 from .widgets import KeyRow
 
@@ -418,10 +418,11 @@ class Overlay(QWidget):
         height = max(1, self._resize_start_size.height())
         dx = cursor.x() - self._resize_start.x()
         dy = cursor.y() - self._resize_start.y()
-        if abs(dx) >= abs(dy):
-            ratio = (width + dx) / width
-        else:
-            ratio = (height + dy) / height
+        ratio = (
+            (width + dx) / width
+            if abs(dx) >= abs(dy)
+            else (height + dy) / height
+        )
         scale = min(
             KEYBOARD_SCALE_MAX,
             max(KEYBOARD_SCALE_MIN, self._resize_start_scale * ratio),
@@ -1214,9 +1215,15 @@ class Overlay(QWidget):
         if not self._capture_enabled or not self._cfg.capture_mouse:
             return
 
-        if self._cfg.ignore_overlay_clicks and not self._click_through and self.isVisible():
-            if self.geometry().contains(QPoint(event.x, event.y)):
-                return
+        # Un clic sur la bulle elle-même ne doit pas s'afficher lorsqu'on
+        # demande d'ignorer les clics faits sur l'overlay.
+        ignores_overlay = (
+            self._cfg.ignore_overlay_clicks
+            and not self._click_through
+            and self.isVisible()
+        )
+        if ignores_overlay and self.geometry().contains(QPoint(event.x, event.y)):
+            return
 
         # Le mode clavier n'affiche ni texte ni pastilles : la souris allume
         # ses boutons sur le schéma au lieu de créer une ligne.

@@ -10,6 +10,11 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
+# Rapports de couverture
+.coverage
+.coverage.*
+htmlcov/
+
 # Empaquetage PyInstaller
 build/
 dist/

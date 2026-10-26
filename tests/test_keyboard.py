@@ -28,7 +28,7 @@ def test_rows_fill_the_same_width(layout):
 @pytest.mark.parametrize("layout", LAYOUTS, ids=LAYOUT_IDS)
 def test_no_token_is_claimed_by_two_keys(layout):
     seen: dict[str, str] = {}
-    for key in layout.keys():
+    for key in layout.iter_keys():
         for token in key.tokens:
             assert token not in seen, f"{token} sur {key.label} et {seen.get(token)}"
             seen[token] = key.label
@@ -65,7 +65,7 @@ def test_accented_key_matches_its_two_glyphs():
 
 def test_shifted_symbol_lights_the_same_key_as_the_digit():
     for layout in LAYOUTS:
-        for key in layout.keys():
+        for key in layout.iter_keys():
             if key.secondary:
                 assert layout.keys_for_token(key.secondary) == (key,)
 

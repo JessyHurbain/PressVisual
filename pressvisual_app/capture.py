@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import sys
 import threading
 import time
@@ -158,16 +159,14 @@ class InputListener(threading.Thread):
 
         for listener in (self._keyboard_listener, self._mouse_listener):
             if listener is not None:
-                try:
+                # L'arrêt d'un écouteur ne doit jamais empêcher l'arrêt de
+                # l'autre, ni celui de l'application.
+                with contextlib.suppress(Exception):
                     listener.stop()
-                except Exception:
-                    pass
         for listener in (self._keyboard_listener, self._mouse_listener):
             if listener is not None:
-                try:
+                with contextlib.suppress(Exception):
                     listener.join(timeout=1.0)
-                except Exception:
-                    pass
 
     # ------------------------------------------------------------------
     # Clavier

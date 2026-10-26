@@ -1,3 +1,5 @@
-# Dépendances de développement (tests)
+# Dépendances de développement (tests et qualité du code)
 -r requirements.txt
 pytest>=8,<9
+pytest-cov>=6,<8
+ruff>=0.17,<1

@@ -15,6 +15,7 @@ from .icon import build_app_icon
 from .keymap import POSITION_CHOICES, POSITION_LABELS, describe_hotkey
 from .overlay import Overlay
 
+
 class TrayController(QObject):
     """Icône de notification et menu de contrôle de PressVisual."""
 

@@ -64,13 +64,14 @@ class KeyboardLayout:
         """Largeur totale, en unités de touche."""
         return max(sum(key.width for key in row) for row in self.rows)
 
-    def keys(self) -> Iterator[Key]:
+    def iter_keys(self) -> Iterator[Key]:
+        """Parcourt les touches, rangée par rangée."""
         for row in self.rows:
             yield from row
 
     def keys_for_token(self, token: str) -> tuple[Key, ...]:
         """Touches qui correspondent à un jeton de capture."""
-        return tuple(key for key in self.keys() if token in key.tokens)
+        return tuple(key for key in self.iter_keys() if token in key.tokens)
 
 
 # ---------------------------------------------------------------------------
@@ -347,7 +348,7 @@ class KeyboardView(QWidget):
         """Étiquettes des touches actuellement allumées (tests, débogage)."""
         return [
             self._label(key)
-            for key in self._definition.keys()
+            for key in self._definition.iter_keys()
             if self._is_active(key)
         ]
 
@@ -383,9 +384,9 @@ class KeyboardView(QWidget):
         if not matching:
             return False
         # Mode masqué : aucune touche de caractère ne s'allume.
-        if self._masked and all(len(token) == 1 for token in matching):
-            return False
-        return True
+        return not (
+            self._masked and all(len(token) == 1 for token in matching)
+        )
 
     def _label(self, key: Key) -> str:
         """Étiquette affichée, en respectant les libellés de la configuration."""

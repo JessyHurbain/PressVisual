@@ -66,23 +66,23 @@ from .keyboard import (
     LAYOUTS,
     QWERTY,
     InputView,
+    Key,
     KeyboardLayout,
     KeyboardView,
-    Key,
     layout_for,
 )
 from .keymap import (
     DISPLAY_MODES,
     KEYBOARD_LAYOUTS,
-    MULTI_CLICK_LABELS,
     MODIFIER_ALIASES,
     MODIFIER_KEYS,
     MODIFIER_ORDER,
+    MULTI_CLICK_LABELS,
     POSITION_CHOICES,
     POSITION_LABELS,
-    TRANSITIONS,
-    TRANSITION_LABELS,
     SPECIAL_KEY_LABELS,
+    TRANSITION_LABELS,
+    TRANSITIONS,
     describe_hotkey,
     key_label,
     modifier_label,
@@ -92,8 +92,8 @@ from .keymap import (
 from .mouse import MOUSE_BUTTONS, MOUSE_SCROLL_FLASH_MS, MouseView
 from .overlay import (
     KEYBOARD_MAX_LIT,
-    RESIZE_GRIP_SIZE,
     MAX_TEXT_LENGTH,
+    RESIZE_GRIP_SIZE,
     SCROLL_AGGREGATE_WINDOW,
     Overlay,
 )

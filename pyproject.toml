@@ -1,0 +1,32 @@
+# Configuration des outils de qualité : ruff (analyse statique) et coverage
+# (mesure de la couverture des tests). Le projet n'étant pas distribué comme
+# paquet, seules les sections d'outils sont définies ici.
+#
+# Python 3.9 est la version minimale annoncée dans le README : ruff doit donc
+# refuser les suggestions de syntaxe plus récente (par exemple `X | None` dans
+# une annotation évaluée à l'exécution).
+
+[tool.ruff]
+target-version = "py39"
+line-length = 88
+
+[tool.ruff.lint]
+# Jeu de règles volontairement restreint : erreurs réelles (E4/E7/E9/F), ordre
+# des imports (I), pièges classiques (B) et simplifications lisibles (SIM).
+# Les règles de modernisation (UP) sont écartées : le code cible encore
+# Python 3.9 et utilise `Optional[...]` pour rester lisible.
+select = ["E4", "E7", "E9", "F", "I", "B", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["pressvisual", "pressvisual_app"]
+
+[tool.coverage.run]
+source = ["pressvisual_app"]
+
+[tool.coverage.report]
+# Seuil volontairement un peu sous la couverture actuelle (~91 %) : il laisse
+# la place à du code neuf avant que ses tests n'arrivent, tout en faisant
+# échouer la CI si la couverture s'effondre.
+fail_under = 85
+show_missing = true
+skip_covered = true

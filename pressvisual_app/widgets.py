@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QSizePolicy, QWidget
 
 from .theme import Palette, _with_alpha
 
+
 class Badge(QWidget):
     """Petite pastille arrondie affichant une touche, un modificateur, etc.
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import sys
@@ -428,10 +429,10 @@ class Config:
                 )
                 + "\n"
             )
-            try:
+            # Le fichier temporaire n'existe pas toujours : son nettoyage ne
+            # doit pas masquer l'erreur d'écriture déjà signalée.
+            with contextlib.suppress(OSError):
                 temp_path.unlink(missing_ok=True)
-            except OSError:
-                pass
             return False
         return True
 

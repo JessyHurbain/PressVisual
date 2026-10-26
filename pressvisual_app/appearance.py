@@ -57,9 +57,10 @@ from .constants import APP_NAME
 from .i18n import LANGUAGE_AUTO, _t
 from .icon import build_app_icon
 from .keyboard import InputView
-from .keymap import TRANSITIONS, TRANSITION_LABELS
+from .keymap import TRANSITION_LABELS, TRANSITIONS
 from .theme import Palette, _config_color
 from .widgets import KeyRow
+
 
 class ColorButton(QPushButton):
     """Bouton affichant une couleur et ouvrant un sélecteur."""
