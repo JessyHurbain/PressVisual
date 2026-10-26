@@ -691,8 +691,42 @@ python -m PyInstaller --noconfirm --clean --onefile --name PressVisual pressvisu
 ```
 
 `--windowed` est inutile sous Linux. Un serveur X11 (ou une session Xorg) est
-nécessaire pour les raccourcis globaux. Pour un paquet distribuable, un AppImage
-ou un `.deb` peuvent être construits à partir de cet exécutable.
+nécessaire pour les raccourcis globaux.
+
+#### AppImage
+
+Pour un paquet distribuable, [`tools/build_appimage.sh`](tools/build_appimage.sh)
+fabrique un AppImage complet, sans toucher à l'environnement Python du système :
+
+```bash
+bash tools/build_appimage.sh
+```
+
+Le script crée un environnement virtuel dans `build/appimage/`, y installe
+PyQt6, pynput et PyInstaller, compile les traductions, empaquette l'application
+en dossier autonome, dessine l'icône 512×512 avec l'application elle-même, puis
+assemble l'AppImage avec `appimagetool` (téléchargé automatiquement au premier
+lancement). Le résultat :
+
+```
+dist/PressVisual-<version>-x86_64.AppImage    # environ 55 Mo
+```
+
+La version vient de `git describe` ; `VERSION=1.0 bash tools/build_appimage.sh`
+en force une autre, et `SKIP_PYINSTALLER=1` réutilise l'empaquetage déjà présent
+pour ne refaire que l'AppImage.
+
+L'`AppRun` embarqué lance l'application avec `--config
+"${XDG_CONFIG_HOME:-$HOME/.config}/pressvisual/config.json"`. C'est nécessaire :
+un AppImage est monté en lecture seule, donc la configuration ne peut pas être
+écrite à côté de l'exécutable. Position libre, apparence, langue et échelle du
+clavier sont ainsi conservées d'un lancement à l'autre.
+
+Pour lancer l'AppImage, FUSE doit être disponible ; sinon,
+`./PressVisual-x86_64.AppImage --appimage-extract-and-run` fonctionne partout.
+La fabrication, elle, n'exige pas FUSE. Construisez de préférence sur la
+distribution la plus ancienne que vous ciblez : l'AppImage hérite de sa version
+de glibc.
 
 ### Notes de packaging
 
@@ -790,7 +824,7 @@ pressvisual_app/      Code de l'application
   tray.py             Icône de notification et menu
   cli.py              Ligne de commande et démarrage
 translations/         Catalogues de traduction (.ts source, .qm compilé)
-tools/                Compilation des .ts en .qm (sans lrelease)
+tools/                Compilation des .ts en .qm, script d'AppImage
 tests/                Suite de tests hors écran (pytest)
 docs/images/          Captures d'écran utilisées par ce README
 .github/workflows/    Intégration continue (tests, analyse statique, couverture)
