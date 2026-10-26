@@ -728,6 +728,18 @@ La fabrication, elle, n'exige pas FUSE. Construisez de préférence sur la
 distribution la plus ancienne que vous ciblez : l'AppImage hérite de sa version
 de glibc.
 
+**Publication automatique.** Pousser un tag `v*` déclenche
+[`.github/workflows/appimage.yml`](.github/workflows/appimage.yml) : la suite de
+tests est rejouée, l'AppImage est construite avec le numéro du tag, conservée
+comme artefact du workflow, puis attachée à la release GitHub du tag (créée avec
+des notes générées si elle n'existe pas encore). Un lancement manuel du workflow
+produit seulement l'artefact, sans toucher aux releases.
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
 ### Notes de packaging
 
 - Testé avec **PyInstaller 6.22.3**, PyQt6 6.11.0 et pynput 1.8.2 sous Windows 11.
@@ -827,7 +839,7 @@ translations/         Catalogues de traduction (.ts source, .qm compilé)
 tools/                Compilation des .ts en .qm, script d'AppImage
 tests/                Suite de tests hors écran (pytest)
 docs/images/          Captures d'écran utilisées par ce README
-.github/workflows/    Intégration continue (tests, analyse statique, couverture)
+.github/workflows/    Intégration continue (tests, qualité, AppImage des releases)
 requirements.txt      Dépendances d'exécution
 requirements-dev.txt  Dépendances de développement (pytest, couverture, ruff)
 pyproject.toml        Règles de ruff et seuil de couverture
