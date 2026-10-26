@@ -812,23 +812,20 @@ de glibc.
 
 **Publication automatique.** Pousser un tag `v*` déclenche
 [`.github/workflows/release.yml`](.github/workflows/release.yml) : la suite de
-tests est rejouée, puis **deux binaires** sont construits avec le numéro du tag
-— l'AppImage sur Ubuntu et le `.exe` sur Windows, chacun conservé comme artefact
-du workflow. Une troisième tâche attend les deux et les attache à la release
-GitHub du tag, créée avec des notes générées si elle n'existe pas encore. Un
-lancement manuel du workflow produit seulement les artefacts, sans toucher aux
-releases.
+tests est rejouée, puis **trois binaires** sont construits avec le numéro du tag
+— l'AppImage sur Ubuntu, le `.exe` sur Windows et le `.dmg` sur macOS —, chacun
+conservé comme artefact du workflow. Une quatrième tâche attend les trois et les
+attache à la release GitHub du tag, créée avec des notes générées si elle
+n'existe pas encore. Un lancement manuel du workflow produit seulement les
+artefacts, sans toucher aux releases.
 
-Si l'une des deux constructions échoue, aucune release n'est créée : c'est
+Si l'une des trois constructions échoue, aucune release n'est créée : c'est
 volontaire, une version à moitié publiée serait pire que pas de version.
 
-macOS n'est pas construit par ce workflow : le `.dmg` doit être fabriqué sur une
-machine Apple avec [`tools/build_macos.sh`](tools/build_macos.sh), puis joint à
-la release :
-
-```bash
-gh release upload v1.0.0 dist/PressVisual-1.0.0-macos-arm64.dmg
-```
+Le `.dmg` est construit sur le runner `macos-26`, donc en **arm64**. Une image
+disque Intel demande un runner `macos-26-intel` ou une machine Intel :
+[`tools/build_macos.sh`](tools/build_macos.sh) s'y exécute de la même façon et
+nomme le fichier d'après l'architecture.
 
 ```bash
 git tag v1.0.0

@@ -1,8 +1,8 @@
 name: Release
 
-# Un tag « v1.2.3 » construit les binaires Linux et Windows, puis les joint à la
-# release GitHub correspondante. Le lancement manuel ne produit que les
-# artefacts, sans toucher aux releases.
+# Un tag « v1.2.3 » construit les binaires Linux, Windows et macOS, puis les
+# joint à la release GitHub correspondante. Le lancement manuel ne produit que
+# les artefacts, sans toucher aux releases.
 on:
   push:
     tags: ["v*"]
@@ -145,9 +145,62 @@ jobs:
           path: dist/*.exe
           if-no-files-found: error
 
+  macos:
+    name: Bundle (macOS)
+    # Runner Apple Silicon : le build PyInstaller cible l'architecture de la
+    # machine qui l'exécute, et le nom du fichier le mentionne. Pour un .dmg
+    # Intel, ajoutez « macos-26-intel » à une matrice.
+    runs-on: macos-26
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v7
+
+      - name: Installer Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      # Le script s'appuie sur iconutil, codesign et hdiutil, fournis par les
+      # outils Xcode déjà présents sur l'image du runner.
+      - name: Construire le bundle
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            export VERSION="${GITHUB_REF_NAME#v}"
+          elif [[ -n "${INPUT_VERSION}" ]]; then
+            export VERSION="${INPUT_VERSION}"
+          fi
+          echo "Version : ${VERSION:-déduite de git describe}"
+          set -o pipefail
+          bash tools/build_macos.sh 2>&1 | tee build-macos.log
+
+      - name: Conserver l'image disque
+        uses: actions/upload-artifact@v7
+        with:
+          name: PressVisual-macOS
+          path: dist/*.dmg
+          if-no-files-found: error
+
+      - name: Conserver les journaux en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: PressVisual-macOS-logs
+          path: |
+            build-macos.log
+            build/macos/*.log
+          if-no-files-found: ignore
+
   release:
     name: Publier la release
-    needs: [appimage, windows]
+    needs: [appimage, windows, macos]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
     # Nécessaire pour créer la release et y déposer les fichiers.
