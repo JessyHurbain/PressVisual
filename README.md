@@ -1,6 +1,6 @@
 # PressVisual — visualiseur de frappes clavier et de clics souris
 
-[![Tests](https://github.com/JessyHurbain/pressvisual/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/JessyHurbain/pressvisual/actions/workflows/tests.yml)
+[![Tests](https://github.com/JessyHurbain/PressVisual/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/JessyHurbain/PressVisual/actions/workflows/tests.yml)
 
 PressVisual est une application de bureau Python qui affiche en temps réel, dans une
 petite bulle flottante, les touches que vous tapez et les clics que vous faites.
