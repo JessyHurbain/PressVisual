@@ -10,8 +10,12 @@ plan, et n'apparaît que lorsqu'il y a quelque chose à montrer.
 
 ![Overlay PressVisual sur un bureau : combinaison Ctrl + Maj + P, touche E et clic droit](docs/images/overlay-standard.png)
 
-> *Les captures de cette page sont générées avec l'application elle-même ; le
-> fond de bureau et la fenêtre sont une illustration.*
+![Démonstration : saisie au clavier, Ctrl + C, clic gauche, molette, puis disparition en glissement](docs/images/demo.gif)
+
+> *Démonstration en mode clavier : les touches s'allument, `Ctrl + C` s'affiche,
+> le bouton gauche s'enfonce, la molette tourne, puis la bulle sort en
+> glissant. Les captures de cette page sont générées avec l'application
+> elle-même ; le fond de bureau et la fenêtre sont une illustration.*
 
 ## Sommaire
 
