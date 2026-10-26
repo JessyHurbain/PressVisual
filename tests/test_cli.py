@@ -219,7 +219,10 @@ def test_frozen_macos_bundle_stores_config_in_application_support(
     monkeypatch.setattr(cli_module.sys, "frozen", True, raising=False)
     monkeypatch.setattr(cli_module.sys, "platform", "darwin")
     monkeypatch.setattr(cli_module.sys, "executable", str(executable))
+    # Path.home() lit HOME sous POSIX et USERPROFILE sous Windows : les deux
+    # sont posés pour que le test se comporte pareil sur toute plateforme.
     monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
 
     path = pressvisual._default_config_path()
 
@@ -236,4 +239,7 @@ def test_frozen_windows_executable_keeps_config_beside_it(monkeypatch, tmp_path)
     monkeypatch.setattr(cli_module.sys, "platform", "win32")
     monkeypatch.setattr(cli_module.sys, "executable", str(executable))
 
-    assert pressvisual._default_config_path() == tmp_path / "config.json"
+    # Comparaison avec le chemin résolu : sous Windows, resolve() développe les
+    # noms courts (« RUNNER~1 ») que tempfile peut produire.
+    expected = executable.resolve().parent / "config.json"
+    assert pressvisual._default_config_path() == expected
