@@ -82,9 +82,13 @@ DEPS_STAMP="$VENV_DIR/.requirements-sum"
 DEPS_SUM=$(cksum <requirements.txt)
 if [[ ! -f $DEPS_STAMP || $(cat "$DEPS_STAMP") != "$DEPS_SUM" ]]; then
     log "installation des dépendances (PyQt6, pynput, PyInstaller)"
-    "$VENV_PYTHON" -m pip install --quiet --upgrade pip
-    "$VENV_PYTHON" -m pip install --quiet -r requirements.txt pyinstaller \
-        || die "installation des dépendances impossible."
+    if ! {
+        "$VENV_PYTHON" -m pip install --quiet --upgrade pip &&
+        "$VENV_PYTHON" -m pip install --quiet -r requirements.txt pyinstaller
+    } >>"$BUILD_DIR/pip.log" 2>&1; then
+        tail -n 20 "$BUILD_DIR/pip.log" >&2
+        die "installation des dépendances impossible (journal : $BUILD_DIR/pip.log)."
+    fi
     printf '%s' "$DEPS_SUM" >"$DEPS_STAMP"
 fi
 
@@ -111,7 +115,10 @@ if [[ ${SKIP_PYINSTALLER:-0} != 1 ]]; then
         --hidden-import pynput.mouse._xorg \
         --hidden-import Xlib \
         pressvisual.py >"$BUILD_DIR/pyinstaller.log" 2>&1 \
-        || die "PyInstaller a échoué ; journal : $BUILD_DIR/pyinstaller.log"
+        || {
+            tail -n 40 "$BUILD_DIR/pyinstaller.log" >&2
+            die "PyInstaller a échoué (journal : $BUILD_DIR/pyinstaller.log)."
+        }
 fi
 
 BUNDLE_DIR="$PYINSTALLER_DIR/dist/$APP_NAME"
@@ -133,17 +140,26 @@ cp -a "$BUNDLE_DIR" "$APPDIR/usr/bin/$APP_NAME"
 # L'icône est dessinée par l'application elle-même : pas de binaire à stocker
 # dans le dépôt, et l'AppImage affiche exactement l'icône de la zone de
 # notification.
+#
+# Le module est chargé par chemin plutôt que par `import pressvisual_app` :
+# importer le paquet tire capture.py, donc pynput, qui exige une connexion X11.
+# Un build sans écran (serveur, conteneur, CI) n'en a pourtant pas besoin.
 log "génération de l'icône 512×512"
-QT_QPA_PLATFORM=offscreen "$VENV_PYTHON" - "$APPDIR/pressvisual.png" <<'PY'
+QT_QPA_PLATFORM=offscreen "$VENV_PYTHON" - \
+    "$ROOT_DIR/pressvisual_app/icon.py" "$APPDIR/pressvisual.png" <<'PY' \
+    || die "génération de l'icône impossible."
+import importlib.util
 import sys
 
 from PyQt6.QtWidgets import QApplication
 
-from pressvisual_app.icon import _icon_pixmap
+spec = importlib.util.spec_from_file_location("_pressvisual_icon", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
 
 app = QApplication([])  # requis pour dessiner avec QPainter
-pixmap = _icon_pixmap(512)
-if not pixmap.save(sys.argv[1], "PNG"):
+pixmap = module._icon_pixmap(512)
+if not pixmap.save(sys.argv[2], "PNG"):
     raise SystemExit("impossible d'enregistrer l'icône")
 PY
 

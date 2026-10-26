@@ -73,7 +73,11 @@ jobs:
             export VERSION="${INPUT_VERSION}"
           fi
           echo "Version : ${VERSION:-déduite de git describe}"
-          bash tools/build_appimage.sh
+          # tee : la sortie complète reste lisible dans le journal du workflow,
+          # et le fichier est joint au run en cas d'échec (les journaux GitHub
+          # ne sont pas accessibles sans authentification).
+          set -o pipefail
+          bash tools/build_appimage.sh 2>&1 | tee build-appimage.log
 
       - name: Conserver l'AppImage
         uses: actions/upload-artifact@v7
@@ -81,6 +85,16 @@ jobs:
           name: PressVisual-AppImage
           path: dist/*.AppImage
           if-no-files-found: error
+
+      - name: Conserver les journaux en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: PressVisual-AppImage-logs
+          path: |
+            build-appimage.log
+            build/appimage/*.log
+          if-no-files-found: ignore
 
   windows:
     name: Exécutable (Windows)

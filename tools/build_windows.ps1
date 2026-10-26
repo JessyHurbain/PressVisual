@@ -106,19 +106,25 @@ if ($LASTEXITCODE -ne 0) { throw "Compilation des traductions impossible." }
 # L'icône est dessinée par l'application elle-même : aucun binaire à stocker
 # dans le dépôt, et l'exécutable porte exactement l'icône de la zone de
 # notification.
+# Le module est chargé par chemin plutôt que par `import pressvisual_app` :
+# importer le paquet tire capture.py, donc pynput, et ses gestionnaires de
+# périphériques, ce dont le dessin d'une icône n'a pas besoin.
 Write-Step "génération de l'icône .ico"
 $iconScript = @'
+import importlib.util
 import sys
 
 from PyQt6.QtWidgets import QApplication
 
-from pressvisual_app.icon import _icon_pixmap
+spec = importlib.util.spec_from_file_location("_pressvisual_icon", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
 
 app = QApplication([])  # requis pour dessiner avec QPainter
-if not _icon_pixmap(256).save(sys.argv[1], "ICO"):
+if not module._icon_pixmap(256).save(sys.argv[2], "ICO"):
     raise SystemExit("impossible d'enregistrer l'icône")
 '@
-$iconScript | & $VenvPython - $IconPath
+$iconScript | & $VenvPython - (Join-Path $Root "pressvisual_app\icon.py") $IconPath
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $IconPath)) {
     Write-Warning "Icône non générée : l'exécutable sera construit sans icône."
 }
