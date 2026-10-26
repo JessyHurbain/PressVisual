@@ -57,7 +57,7 @@ from .constants import APP_NAME
 from .i18n import LANGUAGE_AUTO, _t
 from .icon import build_app_icon
 from .keyboard import InputView
-from .keymap import TRANSITION_LABELS, TRANSITIONS
+from .keymap import TRANSITION_LABELS, TRANSITIONS, transition_geometry
 from .theme import Palette, _config_color
 from .widgets import KeyRow
 
@@ -125,8 +125,6 @@ DEMO_STEP_MS = 700
 PREVIEW_HOLD_MS = 900
 #: Pause sur la bulle masquée avant qu'elle revienne (ms).
 PREVIEW_GAP_MS = 260
-#: Échelle atteinte par le zoom de l'aperçu.
-PREVIEW_ZOOM_SCALE = 0.9
 
 
 def _paint_checkerboard(painter: QPainter, width: int, height: int) -> None:
@@ -214,22 +212,11 @@ class TransitionStage(QWidget):
 
         width = shot.width() / shot.devicePixelRatio()
         height = shot.height() / shot.devicePixelRatio()
-        progress = self._progress
-        dx = dy = 0.0
-        scale = 1.0
-        if self._style == "slide":
-            dy = height * progress
-        elif self._style == "slide-up":
-            dy = -height * progress
-        elif self._style == "slide-left":
-            dx = -width * progress
-        elif self._style == "slide-right":
-            dx = width * progress
-        elif self._style == "zoom":
-            scale = 1.0 - (1.0 - PREVIEW_ZOOM_SCALE) * progress
-
-        if self._style in ("fade", "zoom"):
-            painter.setOpacity(max(0.0, 1.0 - progress))
+        # Même géométrie que l'overlay : les deux ne peuvent pas diverger.
+        dx, dy, scale, opacity = transition_geometry(
+            self._style, width, height, self._progress
+        )
+        painter.setOpacity(max(0.0, min(1.0, opacity)))
 
         center = QPointF(
             self._origin.x() + width / 2 + dx,

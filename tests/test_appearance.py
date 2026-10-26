@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 
-from PyQt6.QtCore import QAbstractAnimation
-from PyQt6.QtGui import QColor, QFontDatabase
+from PyQt6.QtCore import QAbstractAnimation, QPoint
+from PyQt6.QtGui import QColor, QFontDatabase, QPixmap
 from PyQt6.QtWidgets import QApplication, QDialog
 
 import pressvisual
@@ -150,6 +150,33 @@ def test_dialog_preview_paints_without_error(qapp, config):
         assert not pixmap.isNull()
     finally:
         dialog.deleteLater()
+
+
+def test_preview_stage_replays_the_shared_geometry(qapp, monkeypatch):
+    """L'aperçu et l'overlay lisent la même géométrie de transition."""
+    seen = []
+
+    def recorder(style, width, height, progress):
+        seen.append((style, width, height, progress))
+        return 0.0, 0.0, 1.0, 1.0
+
+    monkeypatch.setattr(appearance_module, "transition_geometry", recorder)
+    stage = appearance_module.TransitionStage()
+    try:
+        stage.resize(240, 120)
+        shot = QPixmap(120, 60)
+        shot.fill(QColor("black"))
+        stage.set_frame(shot, QPoint(20, 10), "slide-left", 0.5)
+
+        stage.grab()
+
+        assert seen, "l'aperçu doit passer par la géométrie commune"
+        style, width, height, progress = seen[-1]
+        assert style == "slide-left"
+        assert (width, height) == (120.0, 60.0)
+        assert progress == 0.5
+    finally:
+        stage.deleteLater()
 
 
 def test_dialog_exposes_display_mode_choices(qapp, config):

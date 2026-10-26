@@ -8,6 +8,7 @@ import pytest
 from PyQt6.QtCore import QAbstractAnimation, QSize
 
 import pressvisual
+from pressvisual_app.keymap import SLIDE_DIRECTIONS, ZOOM_SCALE, transition_geometry
 
 
 def finish_entry(overlay, qapp) -> None:
@@ -68,6 +69,64 @@ def test_every_transition_has_a_label():
     for choice in pressvisual.TRANSITIONS:
         assert choice in pressvisual.TRANSITION_LABELS
         assert pressvisual.TRANSITION_LABELS[choice]
+
+
+# ---------------------------------------------------------------------------
+# Géométrie commune à l'overlay et à l'aperçu
+# ---------------------------------------------------------------------------
+
+
+def test_geometry_starts_from_the_resting_bubble():
+    """À progress = 0, aucune transition ne déplace, réduit ni estompe."""
+    for choice in pressvisual.TRANSITIONS:
+        dx, dy, scale, opacity = transition_geometry(choice, 200, 80, 0.0)
+        assert (dx, dy) == pytest.approx((0.0, 0.0))
+        assert scale == pytest.approx(1.0)
+        assert opacity == pytest.approx(1.0)
+
+
+def test_every_slide_transition_has_a_direction():
+    for choice in pressvisual.TRANSITIONS:
+        if choice != "slide" and not choice.startswith("slide-"):
+            continue
+        assert choice in SLIDE_DIRECTIONS
+
+
+def test_geometry_slides_the_bubble_by_its_own_size():
+    expected = {
+        "slide": (0.0, 80.0),
+        "slide-up": (0.0, -80.0),
+        "slide-left": (-200.0, 0.0),
+        "slide-right": (200.0, 0.0),
+    }
+    for choice, (dx, dy) in expected.items():
+        got = transition_geometry(choice, 200, 80, 1.0)
+        assert (got[0], got[1]) == pytest.approx((dx, dy))
+        # Glisser ne change ni la taille ni l'opacité.
+        assert got[2] == pytest.approx(1.0)
+        assert got[3] == pytest.approx(1.0)
+
+
+def test_geometry_fades_without_moving():
+    dx, dy, scale, opacity = transition_geometry("fade", 200, 80, 0.25)
+    assert (dx, dy) == pytest.approx((0.0, 0.0))
+    assert scale == pytest.approx(1.0)
+    assert opacity == pytest.approx(0.75)
+
+
+def test_geometry_shrinks_and_fades_for_zoom():
+    dx, dy, scale, opacity = transition_geometry("zoom", 200, 80, 0.5)
+    assert (dx, dy) == pytest.approx((0.0, 0.0))
+    assert scale == pytest.approx(1.0 + (ZOOM_SCALE - 1.0) * 0.5)
+    assert opacity == pytest.approx(0.5)
+
+
+def test_geometry_leaves_none_untouched():
+    for progress in (0.0, 0.5, 1.0):
+        dx, dy, scale, opacity = transition_geometry("none", 200, 80, progress)
+        assert (dx, dy) == pytest.approx((0.0, 0.0))
+        assert scale == pytest.approx(1.0)
+        assert opacity == pytest.approx(1.0)
 
 
 def test_slide_transition_settings_are_saved(tmp_path):

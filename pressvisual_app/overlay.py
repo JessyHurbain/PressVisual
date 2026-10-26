@@ -49,25 +49,15 @@ from .keymap import (
     MULTI_CLICK_LABELS,
     POSITION_CHOICES,
     POSITION_LABELS,
+    SLIDE_DIRECTIONS,
     key_label,
     modifier_label,
     should_use_combo,
+    transition_geometry,
 )
 from .mouse import MOUSE_SCROLL_FLASH_MS
 from .theme import Palette, _with_alpha
 from .widgets import KeyRow
-
-#: Sens de sortie des transitions glissées, en fraction de la taille de la
-#: bulle : (dx, dy). L'apparition repart du même bord.
-SLIDE_DIRECTIONS: dict[str, tuple[float, float]] = {
-    "slide": (0.0, 1.0),        # sort par le bas
-    "slide-up": (0.0, -1.0),    # sort par le haut
-    "slide-left": (-1.0, 0.0),  # sort par la gauche
-    "slide-right": (1.0, 0.0),  # sort par la droite
-}
-
-#: Échelle atteinte par la transition « zoom » (la bulle rétrécit en sortant).
-ZOOM_SCALE = 0.9
 
 #: Longueur maximale du tampon de texte affiché.
 MAX_TEXT_LENGTH = 200
@@ -139,9 +129,8 @@ class Overlay(QWidget):
         self._slide_target = "idle"
         # Transition en cours : "slide" (déplacement) ou "zoom" (échelle).
         self._slide_mode = ""
-        self._slide_delta = QPoint(0, 0)
+        self._slide_style = ""
         self._zoom_base: Optional[QRect] = None
-        self._zoom_factor = 1.0
 
         # Ancrage : bords conservés lors des changements de taille (coin
         # haut/bas, gauche/centre/droite).
@@ -735,12 +724,9 @@ class Overlay(QWidget):
             return
 
         if transition in SLIDE_DIRECTIONS:
-            dx, dy = SLIDE_DIRECTIONS[transition]
             self._slide_mode = "slide"
+            self._slide_style = transition
             self._slide_origin = self.pos()
-            self._slide_delta = QPoint(
-                int(round(dx * self.width())), int(round(dy * self.height()))
-            )
             self._slide.setDuration(duration)
             self._slide.setStartValue(1.0)
             self._slide.setEndValue(0.0)
@@ -753,7 +739,6 @@ class Overlay(QWidget):
         if transition == "zoom":
             self._slide_mode = "zoom"
             self._zoom_base = QRect(self.geometry())
-            self._zoom_factor = ZOOM_SCALE
             # La taille minimale imposée par le contenu empêcherait de
             # rétrécir : elle est relâchée le temps du zoom.
             self.setMinimumSize(1, 1)
@@ -793,12 +778,9 @@ class Overlay(QWidget):
             return
 
         if transition in SLIDE_DIRECTIONS:
-            dx, dy = SLIDE_DIRECTIONS[transition]
             self._slide_mode = "slide"
+            self._slide_style = transition
             self._slide_origin = self.pos()
-            self._slide_delta = QPoint(
-                int(round(dx * self.width())), int(round(dy * self.height()))
-            )
             self._slide.setDuration(duration)
             self._slide.setStartValue(0.0)
             self._slide.setEndValue(1.0)
@@ -810,7 +792,6 @@ class Overlay(QWidget):
         if transition == "zoom":
             self._slide_mode = "zoom"
             self._zoom_base = QRect(self.geometry())
-            self._zoom_factor = ZOOM_SCALE
             self.setMinimumSize(1, 1)
             self._slide.setDuration(duration)
             self._slide.setStartValue(0.0)
@@ -842,7 +823,7 @@ class Overlay(QWidget):
         self._end_zoom()
         self.setWindowOpacity(1.0)
         self._slide_mode = ""
-        self._slide_delta = QPoint(0, 0)
+        self._slide_style = ""
         self._slide_origin = None
         if self.isVisible():
             self._apply_anchor()
@@ -870,7 +851,7 @@ class Overlay(QWidget):
         # de revenir à sa position d'ancrage.
         self._end_zoom()
         self._slide_mode = ""
-        self._slide_delta = QPoint(0, 0)
+        self._slide_style = ""
         self._slide_origin = None
         self.setWindowOpacity(1.0)
         self._clear_rows()
@@ -893,23 +874,28 @@ class Overlay(QWidget):
             base = self._zoom_base
             if base is None:
                 return
-            factor = 1.0 + (self._zoom_factor - 1.0) * value
-            width = max(1, int(round(base.width() * factor)))
-            height = max(1, int(round(base.height() * factor)))
+            _, _, scale, opacity = transition_geometry(
+                "zoom", base.width(), base.height(), value
+            )
+            width = max(1, int(round(base.width() * scale)))
+            height = max(1, int(round(base.height() * scale)))
             self.setGeometry(
                 base.x() + (base.width() - width) // 2,
                 base.y() + (base.height() - height) // 2,
                 width,
                 height,
             )
-            self.setWindowOpacity(max(0.0, min(1.0, 1.0 - value)))
+            self.setWindowOpacity(max(0.0, min(1.0, opacity)))
             return
 
         if self._slide_mode != "slide" or self._slide_origin is None:
             return
+        dx, dy, _, _ = transition_geometry(
+            self._slide_style, self.width(), self.height(), value
+        )
         self.move(
-            self._slide_origin.x() + int(round(self._slide_delta.x() * value)),
-            self._slide_origin.y() + int(round(self._slide_delta.y() * value)),
+            self._slide_origin.x() + int(round(dx)),
+            self._slide_origin.y() + int(round(dy)),
         )
 
     def _hide_now(self) -> None:
@@ -919,7 +905,7 @@ class Overlay(QWidget):
         self._slide_target = "idle"
         self._end_zoom()
         self._slide_mode = ""
-        self._slide_delta = QPoint(0, 0)
+        self._slide_style = ""
         self._slide_origin = None
         self._idle_timer.stop()
         self._typing_timer.stop()

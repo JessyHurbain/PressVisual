@@ -53,6 +53,43 @@ TRANSITION_LABELS: dict[str, str] = {
     "none": "Aucune",
 }
 
+#: Sens de sortie des transitions glissées, en fraction de la taille de la
+#: bulle : (dx, dy). L'apparition repart du même bord.
+SLIDE_DIRECTIONS: dict[str, tuple[float, float]] = {
+    "slide": (0.0, 1.0),        # sort par le bas
+    "slide-up": (0.0, -1.0),    # sort par le haut
+    "slide-left": (-1.0, 0.0),  # sort par la gauche
+    "slide-right": (1.0, 0.0),  # sort par la droite
+}
+
+#: Échelle atteinte par la transition « zoom » (la bulle rétrécit en sortant).
+ZOOM_SCALE = 0.9
+
+
+def transition_geometry(
+    style: str, width: float, height: float, progress: float
+) -> tuple[float, float, float, float]:
+    """Décale, réduit et estompe une bulle selon sa transition.
+
+    ``progress`` vaut 0 pour la bulle en place et 1 pour la bulle sortie.
+    Renvoie ``(dx, dy, échelle, opacité)``.
+
+    L'overlay et l'aperçu des réglages appellent tous deux cette fonction :
+    ajouter une transition ne demande donc qu'une entrée dans
+    ``TRANSITIONS``, un libellé et, si elle glisse, une direction.
+    """
+    fx, fy = SLIDE_DIRECTIONS.get(style, (0.0, 0.0))
+    if style == "zoom":
+        return (
+            0.0,
+            0.0,
+            1.0 + (ZOOM_SCALE - 1.0) * progress,
+            1.0 - progress,
+        )
+    if style == "fade":
+        return 0.0, 0.0, 1.0, 1.0 - progress
+    return fx * width * progress, fy * height * progress, 1.0, 1.0
+
 #: Ordre d'affichage des modificateurs dans une combinaison.
 MODIFIER_ORDER: tuple[str, ...] = ("ctrl", "alt", "shift", "win")
 
