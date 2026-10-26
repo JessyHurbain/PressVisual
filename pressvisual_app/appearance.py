@@ -5,7 +5,17 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Optional
 
-from PyQt6.QtCore import QRectF, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import (
+    QEasingCurve,
+    QPoint,
+    QPointF,
+    QRectF,
+    QSize,
+    Qt,
+    QTimer,
+    QVariantAnimation,
+    pyqtSignal,
+)
 from PyQt6.QtGui import (
     QColor,
     QCursor,
@@ -18,6 +28,7 @@ from PyQt6.QtGui import (
     QPainterPath,
     QPen,
     QPixmap,
+    QRegion,
 )
 from PyQt6.QtWidgets import (
     QApplication,
@@ -36,6 +47,7 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QSlider,
     QSpinBox,
+    QStackedLayout,
     QVBoxLayout,
     QWidget,
 )
@@ -108,6 +120,124 @@ class ColorButton(QPushButton):
 
 #: Cadence des étapes de la démonstration animée de l'aperçu (ms).
 DEMO_STEP_MS = 700
+#: Temps d'affichage complet de la bulle entre deux transitions (ms).
+PREVIEW_HOLD_MS = 900
+#: Pause sur la bulle masquée avant qu'elle revienne (ms).
+PREVIEW_GAP_MS = 260
+#: Échelle atteinte par le zoom de l'aperçu.
+PREVIEW_ZOOM_SCALE = 0.9
+
+
+def _paint_checkerboard(painter: QPainter, width: int, height: int) -> None:
+    """Damier transparent, visible autour de la bulle."""
+    painter.fillRect(0, 0, width, height, QColor("#eceef2"))
+    checker = 12
+    for y in range(0, height, checker):
+        for x in range(0, width, checker):
+            if (x // checker + y // checker) % 2:
+                painter.fillRect(x, y, checker, checker, QColor("#e2e5ea"))
+
+
+class BubbleSurface(QWidget):
+    """Bulle de l'aperçu : fond arrondi, dégradé et contenu réel."""
+
+    def __init__(
+        self, config: Config, palette: Palette, parent: Optional[QWidget] = None
+    ) -> None:
+        super().__init__(parent)
+        self._config = config
+        self._palette = palette
+
+    def set_config(self, config: Config) -> None:
+        self._config = config
+        self.update()
+
+    def paintEvent(self, event) -> None:  # noqa: N802 - API Qt
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        radius = float(self._config.corner_radius)
+        path = QPainterPath()
+        path.addRoundedRect(rect, radius, radius)
+
+        alpha = int(round(255 * self._config.opacity))
+        top = QColor(self._palette.panel_top)
+        top.setAlpha(alpha)
+        bottom = QColor(self._palette.panel_bottom)
+        bottom.setAlpha(alpha)
+        gradient = QLinearGradient(rect.topLeft(), rect.bottomLeft())
+        gradient.setColorAt(0.0, top)
+        gradient.setColorAt(1.0, bottom)
+        painter.fillPath(path, gradient)
+        painter.setPen(QPen(self._palette.border, 1.0))
+        painter.drawPath(path)
+
+
+class TransitionStage(QWidget):
+    """Rejoue l'image de la bulle avec la transition choisie.
+
+    L'aperçu n'est pas une vraie fenêtre : la bulle y est dessinée comme une
+    image, décalée ou rétrécie selon l'avancement, sur le damier.
+    """
+
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self._shot: Optional[QPixmap] = None
+        self._origin = QPoint(0, 0)
+        self._style = "fade"
+        self._progress = 0.0
+
+    def set_frame(
+        self,
+        shot: Optional[QPixmap],
+        origin: QPoint,
+        style: str,
+        progress: float,
+    ) -> None:
+        self._shot = shot
+        self._origin = origin
+        self._style = style
+        self._progress = max(0.0, min(1.0, float(progress)))
+        self.update()
+
+    def paintEvent(self, event) -> None:  # noqa: N802 - API Qt
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+        _paint_checkerboard(painter, self.width(), self.height())
+
+        shot = self._shot
+        if shot is None:
+            return
+
+        width = shot.width() / shot.devicePixelRatio()
+        height = shot.height() / shot.devicePixelRatio()
+        progress = self._progress
+        dx = dy = 0.0
+        scale = 1.0
+        if self._style == "slide":
+            dy = height * progress
+        elif self._style == "slide-up":
+            dy = -height * progress
+        elif self._style == "slide-left":
+            dx = -width * progress
+        elif self._style == "slide-right":
+            dx = width * progress
+        elif self._style == "zoom":
+            scale = 1.0 - (1.0 - PREVIEW_ZOOM_SCALE) * progress
+
+        if self._style in ("fade", "zoom"):
+            painter.setOpacity(max(0.0, 1.0 - progress))
+
+        center = QPointF(
+            self._origin.x() + width / 2 + dx,
+            self._origin.y() + height / 2 + dy,
+        )
+        painter.translate(center)
+        painter.scale(scale, scale)
+        painter.translate(-width / 2, -height / 2)
+        painter.drawPixmap(QPointF(0, 0), shot)
 
 
 class PreviewPanel(QWidget):
@@ -117,6 +247,9 @@ class PreviewPanel(QWidget):
     clavier, un bouton de souris s'enfonce, puis une combinaison et un clic
     droit prennent le relais. Le mode standard montre la même chose sous
     forme de pastilles.
+
+    La bulle disparaît et revient ensuite avec la transition choisie, sur
+    sa durée réelle, pour juger du réglage sans ouvrir l'overlay.
     """
 
     def __init__(
@@ -130,7 +263,22 @@ class PreviewPanel(QWidget):
         self._palette = Palette.from_config(config)
         self.setMinimumHeight(180)
 
-        self._layout = QVBoxLayout(self)
+        # Deux pages de même taille : la bulle réelle, puis son image animée
+        # pendant la transition. Le passage de l'une à l'autre ne fait pas
+        # bouger la mise en page.
+        self._surface = BubbleSurface(config, self._palette, self)
+        self._stage = TransitionStage(self)
+        self._stack = QStackedLayout()
+        self._stack.setContentsMargins(0, 0, 0, 0)
+        self._stack.addWidget(self._surface)
+        self._stack.addWidget(self._stage)
+        self._stack.setCurrentWidget(self._surface)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addLayout(self._stack)
+
+        self._layout = QVBoxLayout(self._surface)
         self._layout.setContentsMargins(20, 16, 20, 16)
         self._layout.setSpacing(7)
         self._layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
@@ -146,7 +294,7 @@ class PreviewPanel(QWidget):
         # Démonstration animée : une pastille dont le contenu change pour
         # montrer une frappe puis un clic dans le mode standard. Elle est
         # placée en tête pour rester visible sans faire défiler l'aperçu.
-        self._demo_row = KeyRow(font, self._palette, self)
+        self._demo_row = KeyRow(font, self._palette, self._surface)
         self._layout.addWidget(self._demo_row)
 
         self._rows: list[KeyRow] = []
@@ -157,14 +305,16 @@ class PreviewPanel(QWidget):
             ((_t("bonjour"), "text"),),
         )
         for items in samples:
-            row = KeyRow(font, self._palette, self)
+            row = KeyRow(font, self._palette, self._surface)
             row.set_items(items)
             self._layout.addWidget(row)
             self._rows.append(row)
 
         keyboard_font = QFont(font)
         keyboard_font.setPointSize(max(9, config.font_size - 4))
-        self._visual = InputView(config, keyboard_font, self._palette, self)
+        self._visual = InputView(
+            config, keyboard_font, self._palette, self._surface
+        )
         self._keyboard = self._visual.keyboard
         self._mouse = self._visual.mouse
         self._layout.addWidget(self._visual, 0, Qt.AlignmentFlag.AlignLeft)
@@ -174,10 +324,23 @@ class PreviewPanel(QWidget):
         self._demo_timer.setInterval(DEMO_STEP_MS)
         self._demo_timer.timeout.connect(self._advance_demo)
 
+        # Cycle de la transition : bulle visible, sortie, pause, retour.
+        self._phase = "idle"
+        self._progress = 0.0
+        self._shot: Optional[QPixmap] = None
+        self._origin = QPoint(0, 0)
+        self._transition = QVariantAnimation(self)
+        self._transition.valueChanged.connect(self._on_transition_value)
+        self._transition.finished.connect(self._on_transition_finished)
+        self._cycle_timer = QTimer(self)
+        self._cycle_timer.setSingleShot(True)
+        self._cycle_timer.timeout.connect(self._on_cycle_timeout)
+
         self._apply_mode(config)
         self._apply_demo_step()
         self._demo_timer.start()
         self._sync_minimum_size()
+        self.restart_transition()
 
     # ------------------------------------------------------------------
     # Démonstration animée
@@ -247,6 +410,7 @@ class PreviewPanel(QWidget):
     def update_appearance(self, config: Config, font_family: str) -> None:
         self._config = config
         self._palette.update_from_config(config)
+        self._surface.set_config(config)
 
         font = QFont(font_family)
         font.setPointSize(max(9, config.font_size - 1))
@@ -261,39 +425,151 @@ class PreviewPanel(QWidget):
         self._visual.set_font(keyboard_font)
         self._apply_mode(config)
         self._sync_minimum_size()
+        # Un nouveau réglage relance la démonstration de la transition.
+        self.restart_transition()
         # Le QScrollArea réévalue la taille du widget après le layout : on
         # réapplique la taille minimale une fois celui-ci stabilisé.
         self._min_timer.start(0)
         self.update()
 
     # ------------------------------------------------------------------
+    # Aperçu de la transition
+    # ------------------------------------------------------------------
+    def _transition_style(self) -> str:
+        """Transition à montrer : celle de la configuration, sinon fondu."""
+        style = str(self._config.transition or "fade").strip().lower()
+        return style if style in TRANSITION_LABELS else "fade"
+
+    def _exit_duration(self) -> int:
+        if self._transition_style() == "none":
+            return 0
+        return max(0, int(self._config.fade_out_ms))
+
+    def _entry_duration(self) -> int:
+        duration = self._exit_duration()
+        if duration <= 0:
+            return 0
+        return min(max(0, int(self._config.fade_in_ms)), duration)
+
+    def hideEvent(self, event) -> None:  # noqa: N802 - API Qt
+        """Suspend les animations quand l'aperçu n'est plus visible."""
+        self._demo_timer.stop()
+        self._transition.stop()
+        self._cycle_timer.stop()
+        super().hideEvent(event)
+
+    def showEvent(self, event) -> None:  # noqa: N802 - API Qt
+        """Relance la démonstration à l'ouverture de la fenêtre."""
+        super().showEvent(event)
+        if not self._demo_timer.isActive():
+            self._demo_timer.start()
+        self.restart_transition()
+
+    def restart_transition(self) -> None:
+        """Rejoue l'aperçu de la transition depuis le début."""
+        self._transition.stop()
+        self._cycle_timer.stop()
+        self._phase = "idle"
+        self._progress = 0.0
+        self._shot = None
+        self._stack.setCurrentWidget(self._surface)
+        self._cycle_timer.start(PREVIEW_HOLD_MS)
+        self.update()
+
+    def _on_cycle_timeout(self) -> None:
+        if self._phase == "idle":
+            self._start_exit()
+        elif self._phase == "hidden":
+            self._start_entry()
+
+    def _freeze(self) -> None:
+        """Copie l'image de la bulle, sans le damier de l'aperçu."""
+        surface = self._surface
+        ratio = surface.devicePixelRatioF()
+        pixmap = QPixmap(surface.size() * ratio)
+        pixmap.setDevicePixelRatio(ratio)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        surface.render(
+            painter, QPoint(), QRegion(), QWidget.RenderFlag.DrawChildren
+        )
+        painter.end()
+        self._shot = pixmap
+        self._origin = surface.pos()
+
+    def _start_exit(self) -> None:
+        """Gèle l'image de la bulle et la fait sortir."""
+        style = self._transition_style()
+        duration = self._exit_duration()
+        if style == "none" or duration <= 0:
+            self._shot = None
+            self._stack.setCurrentWidget(self._stage)
+            self._phase = "hidden"
+            self._progress = 1.0
+            self._update_stage()
+            self._cycle_timer.start(PREVIEW_GAP_MS)
+            return
+        self._freeze()
+        self._stack.setCurrentWidget(self._stage)
+        self._phase = "exit"
+        self._progress = 0.0
+        self._update_stage()
+        self._run(duration, 1.0, QEasingCurve.Type.InCubic)
+
+    def _start_entry(self) -> None:
+        """Ramenne la bulle avec la même transition, en sens inverse."""
+        duration = self._entry_duration()
+        if duration <= 0:
+            self._finish_entry()
+            return
+        self._freeze()
+        self._phase = "entry"
+        self._progress = 1.0
+        self._update_stage()
+        self._run(duration, 0.0, QEasingCurve.Type.OutCubic)
+
+    def _run(
+        self, duration: int, end: float, easing: QEasingCurve.Type
+    ) -> None:
+        self._transition.stop()
+        self._transition.setDuration(max(1, duration))
+        self._transition.setEasingCurve(easing)
+        self._transition.setStartValue(0.0 if end else 1.0)
+        self._transition.setEndValue(end)
+        self._transition.start()
+
+    def _on_transition_value(self, value: float) -> None:
+        self._progress = float(value)
+        self._update_stage()
+
+    def _on_transition_finished(self) -> None:
+        if self._phase == "exit":
+            self._phase = "hidden"
+            self._progress = 1.0
+            self._update_stage()
+            self._cycle_timer.start(PREVIEW_GAP_MS)
+            return
+        if self._phase == "entry":
+            self._finish_entry()
+
+    def _finish_entry(self) -> None:
+        """Rend la vraie bulle à l'aperçu, prête pour le tour suivant."""
+        self._phase = "idle"
+        self._progress = 0.0
+        self._shot = None
+        self._stack.setCurrentWidget(self._surface)
+        self._cycle_timer.start(PREVIEW_HOLD_MS)
+        self.update()
+
+    def _update_stage(self) -> None:
+        self._stage.set_frame(
+            self._shot, self._origin, self._transition_style(), self._progress
+        )
+
+    # ------------------------------------------------------------------
     def paintEvent(self, event) -> None:  # noqa: N802 - API Qt
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-
-        painter.fillRect(self.rect(), QColor("#eceef2"))
-        checker = 12
-        for y in range(0, self.height(), checker):
-            for x in range(0, self.width(), checker):
-                if (x // checker + y // checker) % 2:
-                    painter.fillRect(x, y, checker, checker, QColor("#e2e5ea"))
-
-        rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
-        radius = float(self._config.corner_radius)
-        path = QPainterPath()
-        path.addRoundedRect(rect, radius, radius)
-
-        alpha = int(round(255 * self._config.opacity))
-        top = QColor(self._palette.panel_top)
-        top.setAlpha(alpha)
-        bottom = QColor(self._palette.panel_bottom)
-        bottom.setAlpha(alpha)
-        gradient = QLinearGradient(rect.topLeft(), rect.bottomLeft())
-        gradient.setColorAt(0.0, top)
-        gradient.setColorAt(1.0, bottom)
-        painter.fillPath(path, gradient)
-        painter.setPen(QPen(self._palette.border, 1.0))
-        painter.drawPath(path)
+        _paint_checkerboard(painter, self.width(), self.height())
 
 
 class AppearanceDialog(QDialog):

@@ -240,6 +240,10 @@ transition sur `fade_in_ms` (120 ms par défaut), ou sur `fade_out_ms` s'il est
 plus court, pour qu'une frappe allume la bulle sans délai. Une frappe pendant
 la disparition rappelle la bulle à sa place, sans la laisser à moitié sortie.
 
+La fenêtre de personnalisation rejoue la transition en boucle dans son
+**Aperçu** : la bulle sort puis revient à la cadence choisie, ce qui permet de
+comparer les styles et d'ajuster la durée sans quitter les réglages.
+
 ### Mode clavier complet
 
 Avec `"display_mode": "keyboard"`, la bulle affiche un **clavier compact** à
@@ -296,7 +300,11 @@ fenêtre de réglages avec un aperçu en direct :
   Le changement s'applique dès l'enregistrement, sans redémarrer.
 - **Aperçu animé** : la démonstration rejoue en boucle une frappe et un clic
   (touche `A`, puis `Maj + E` avec un clic droit et un cran de molette), dans
-  le mode choisi, pour juger du rendu sans rien taper soi-même.
+  le mode choisi, pour juger du rendu sans rien taper soi-même. La bulle
+  disparaît et revient ensuite avec la transition sélectionnée, sur sa durée
+  réelle (la disparition sur `fade_out_ms`, le retour sur `fade_in_ms`) :
+  glissements, zoom et fondu se voient donc avant d'enregistrer, et chaque
+  changement de réglage relance la démonstration.
 - **Réinitialiser** restaure les valeurs d'origine, **Annuler** ferme sans rien
   changer et **Enregistrer** applique les réglages immédiatement puis les écrit
   dans le fichier de configuration.

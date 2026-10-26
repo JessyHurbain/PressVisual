@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+from PyQt6.QtCore import QAbstractAnimation
 from PyQt6.QtGui import QColor, QFontDatabase
 from PyQt6.QtWidgets import QApplication, QDialog
 
@@ -425,3 +426,133 @@ def test_choose_font_family_returns_available_default(config):
 
     assert family
     assert family in QFontDatabase.families() or family == QApplication.font().family()
+
+
+# ---------------------------------------------------------------------------
+# Aperçu de la transition
+# ---------------------------------------------------------------------------
+
+
+def test_preview_freezes_the_bubble_without_the_checkerboard(qapp, config):
+    dialog = make_dialog(qapp, config)
+    try:
+        dialog.preview.resize(420, 160)
+        dialog.preview.update_appearance(dialog._preview_config(), "DejaVu Sans")
+        preview = dialog.preview
+
+        preview._freeze()
+
+        assert preview._shot is not None
+        image = preview._shot.toImage()
+        # Le coin arrondi reste transparent : le damier n'est pas figé avec.
+        assert image.pixelColor(0, 0).alpha() == 0
+        centre = image.pixelColor(image.width() // 2, image.height() // 2)
+        assert centre.alpha() > 0
+    finally:
+        dialog.deleteLater()
+
+
+def test_preview_plays_the_transition_and_returns(qapp, config):
+    config.transition = "slide"
+    config.fade_out_ms = 200
+    dialog = make_dialog(qapp, config)
+    try:
+        preview = dialog.preview
+        preview._start_exit()
+
+        assert preview._stack.currentWidget() is preview._stage
+        assert preview._phase == "exit"
+        assert preview._stage._style == "slide"
+
+        preview._transition.setCurrentTime(100)
+        qapp.processEvents()
+        assert 0.0 < preview._progress < 1.0
+
+        preview._transition.setCurrentTime(200)
+        qapp.processEvents()
+        assert preview._phase == "hidden"
+        assert preview._cycle_timer.isActive()
+
+        preview._start_entry()
+        preview._transition.setCurrentTime(preview._transition.duration())
+        qapp.processEvents()
+
+        assert preview._phase == "idle"
+        assert preview._stack.currentWidget() is preview._surface
+    finally:
+        dialog.deleteLater()
+
+
+def test_preview_none_transition_hides_at_once(qapp, config):
+    config.transition = "none"
+    dialog = make_dialog(qapp, config)
+    try:
+        preview = dialog.preview
+        preview._start_exit()
+
+        assert preview._phase == "hidden"
+        assert preview._transition.state() != QAbstractAnimation.State.Running
+        # Rien à dessiner : la bulle est déjà sortie.
+        assert preview._shot is None
+        assert preview._stack.currentWidget() is preview._stage
+    finally:
+        dialog.deleteLater()
+
+
+def test_preview_follows_the_chosen_duration(qapp, config):
+    config.transition = "zoom"
+    config.fade_out_ms = 900
+    dialog = make_dialog(qapp, config)
+    try:
+        preview = dialog.preview
+        preview._start_exit()
+
+        assert preview._transition.duration() == 900
+        assert preview._stage._style == "zoom"
+    finally:
+        dialog.deleteLater()
+
+
+def test_changing_the_transition_restarts_the_preview(qapp, config):
+    dialog = make_dialog(qapp, config)
+    try:
+        preview = dialog.preview
+        preview._start_exit()
+        preview._transition.setCurrentTime(100)
+
+        dialog.transition_combo.setCurrentIndex(
+            dialog.transition_combo.findData("slide-left")
+        )
+
+        assert preview._phase == "idle"
+        assert preview._transition.state() != QAbstractAnimation.State.Running
+        assert preview._stack.currentWidget() is preview._surface
+    finally:
+        dialog.deleteLater()
+
+
+def test_preview_cycle_hides_then_brings_the_bubble_back(qapp, config):
+    config.transition = "fade"
+    config.fade_out_ms = 120
+    dialog = make_dialog(qapp, config)
+    try:
+        preview = dialog.preview
+        preview.restart_transition()
+        assert preview._phase == "idle"
+
+        preview._on_cycle_timeout()
+        assert preview._phase == "exit"
+
+        preview._transition.setCurrentTime(preview._transition.duration())
+        qapp.processEvents()
+        assert preview._phase == "hidden"
+
+        preview._on_cycle_timeout()
+        assert preview._phase == "entry"
+
+        preview._transition.setCurrentTime(preview._transition.duration())
+        qapp.processEvents()
+        assert preview._phase == "idle"
+        assert preview._stack.currentWidget() is preview._surface
+    finally:
+        dialog.deleteLater()
