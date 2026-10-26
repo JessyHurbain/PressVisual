@@ -27,7 +27,11 @@ jobs:
       # version minimale annoncée : les deux doivent être vérifiés, pas seulement
       # la combinaison la plus récente sous Linux.
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        # Ubuntu 24.04 est épinglé volontairement : « ubuntu-latest » bascule
+        # progressivement sur Ubuntu 26.04, pour lequel actions/setup-python ne
+        # fournit pas de Python 3.9 précompilé. L'épinglage évite aussi qu'un
+        # même commit échoue sur un runner et passe sur l'autre.
+        os: [ubuntu-24.04, windows-latest]
         python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
