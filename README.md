@@ -815,9 +815,23 @@ de glibc.
 tests est rejouée, puis **trois binaires** sont construits avec le numéro du tag
 — l'AppImage sur Ubuntu, le `.exe` sur Windows et le `.dmg` sur macOS —, chacun
 conservé comme artefact du workflow. Une quatrième tâche attend les trois et les
-attache à la release GitHub du tag, créée avec des notes générées si elle
-n'existe pas encore. Un lancement manuel du workflow produit seulement les
-artefacts, sans toucher aux releases.
+attache à la release GitHub du tag, créée si elle n'existe pas encore. Un
+lancement manuel du workflow produit seulement les artefacts, sans toucher aux
+releases.
+
+Les notes de release sont **le message du tag annoté** :
+
+```bash
+git tag -a v1.1.0 -m "v1.1.0 — ce qui change
+
+Le détail, en quelques lignes."
+git push origin v1.1.0
+```
+
+C'est ce message qui s'affiche, et non un « Full Changelog » vide —
+`--generate-notes` ne remplit rien tant que le projet n'utilise pas de pull
+requests. Un tag léger (créé sans `-a`) n'a pas de message : le workflow
+détecte le type du tag et retombe alors sur les notes générées.
 
 Si l'une des trois constructions échoue, aucune release n'est créée : c'est
 volontaire, une version à moitié publiée serait pire que pas de version.

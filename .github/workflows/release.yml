@@ -226,11 +226,26 @@ jobs:
         run: |
           TAG="${GITHUB_REF_NAME}"
           ls -lh dist
+
+          # Le message du tag annoté décrit la version ; --generate-notes ne
+          # remplit rien sans pull requests et ne laisse qu'un lien de
+          # comparaison. Un tag léger n'a pas de message : gh échouerait, d'où
+          # la vérification préalable de son type.
+          TAG_TYPE=$(gh api "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG}" \
+            --jq '.object.type' 2>/dev/null || echo commit)
+          if [[ "$TAG_TYPE" == "tag" ]]; then
+            NOTES=(--notes-from-tag)
+            echo "notes : message du tag annoté"
+          else
+            NOTES=(--generate-notes)
+            echo "tag léger : notes générées"
+          fi
+
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "release $TAG déjà présente : remplacement des binaires"
             gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" "${NOTES[@]}"
           else
             gh release create "$TAG" dist/* \
-              --title "PressVisual ${TAG#v}" \
-              --generate-notes
+              --title "PressVisual ${TAG#v}" "${NOTES[@]}"
           fi
