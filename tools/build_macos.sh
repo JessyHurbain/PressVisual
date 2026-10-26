@@ -38,8 +38,10 @@ cd "$ROOT_DIR"
 BUILD_DIR="$ROOT_DIR/build/macos"
 VENV_DIR="$BUILD_DIR/venv"
 APP_NAME="PressVisual"
-APP_BUNDLE="$BUILD_DIR/dist/$APP_NAME.app"
 PYINSTALLER_DIR="$BUILD_DIR/pyinstaller"
+# Le bundle est écrit sous le --distpath passé à PyInstaller, pas dans
+# build/macos/dist : c'est pyinstaller/dist que le script interroge ensuite.
+APP_BUNDLE="$PYINSTALLER_DIR/dist/$APP_NAME.app"
 DIST_DIR="$ROOT_DIR/dist"
 ICONSET_DIR="$BUILD_DIR/$APP_NAME.iconset"
 ICON_PATH="$BUILD_DIR/$APP_NAME.icns"
