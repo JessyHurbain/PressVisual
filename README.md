@@ -196,7 +196,9 @@ traductions (catalogue complet, `.qm` à jour, rendu en anglais).
 Sous Linux sans session graphique, l'import de `pynput` a besoin d'un serveur
 X11 : lancez alors `xvfb-run -a python -m pytest`. C'est ce que fait le workflow
 [`.github/workflows/tests.yml`](.github/workflows/tests.yml), exécuté à chaque
-poussée sur `main` et à chaque pull request (Python 3.11 et 3.12).
+poussée sur `main` et à chaque pull request. Sa matrice couvre **Linux et
+Windows** avec **Python 3.9 à 3.12**, sous le greffon Qt « offscreen » : aucune
+fenêtre ne s'ouvre, et rien n'est envoyé au vrai clavier ni à la vraie souris.
 
 ## Lancement
 

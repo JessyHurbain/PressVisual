@@ -15,12 +15,20 @@ concurrency:
 
 jobs:
   pytest:
-    name: Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    name: Python ${{ matrix.python-version }} · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    env:
+      # Sortie UTF-8 sur Windows : les messages de test sont en français.
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
     strategy:
       fail-fast: false
+      # Windows est la plateforme principale de PressVisual et Python 3.9 est la
+      # version minimale annoncée : les deux doivent être vérifiés, pas seulement
+      # la combinaison la plus récente sous Linux.
       matrix:
-        python-version: ["3.11", "3.12"]
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
       - name: Récupérer le dépôt
@@ -36,6 +44,7 @@ jobs:
             requirements-dev.txt
 
       - name: Installer les bibliothèques système de Qt
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -51,6 +60,11 @@ jobs:
 
       # Les tests utilisent le greffon Qt « offscreen » : aucune fenêtre ne
       # s'ouvre. Xvfb fournit seulement l'affichage X11 dont pynput a besoin
-      # pour s'importer sous Linux.
-      - name: Lancer les tests
+      # pour s'importer sous Linux ; Windows n'en a pas besoin.
+      - name: Lancer les tests (Linux)
+        if: runner.os == 'Linux'
         run: xvfb-run -a python -m pytest -q
+
+      - name: Lancer les tests (Windows)
+        if: runner.os == 'Windows'
+        run: python -m pytest -q
