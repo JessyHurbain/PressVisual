@@ -692,6 +692,10 @@ Options : `-Version 1.0.0` (sinon `git describe`), `-SkipInstall` pour réutilis
 l'environnement déjà créé, `-Python` pour choisir l'interpréteur. Les dépendances
 ne sont réinstallées que si `requirements.txt` change.
 
+C'est exactement ce script que la CI exécute sur un runner Windows pour joindre
+un `PressVisual-<version>-win64.exe` à chaque release (voir la section AppImage
+ci-dessous).
+
 Placez `config.json` **à côté de l'exécutable** si vous voulez une configuration
 persistante. Le coin choisi dans le menu y est enregistré automatiquement ; dans
 un dossier protégé en écriture (`C:\Program Files`, par exemple), lancez plutôt
@@ -754,11 +758,16 @@ distribution la plus ancienne que vous ciblez : l'AppImage hérite de sa version
 de glibc.
 
 **Publication automatique.** Pousser un tag `v*` déclenche
-[`.github/workflows/appimage.yml`](.github/workflows/appimage.yml) : la suite de
-tests est rejouée, l'AppImage est construite avec le numéro du tag, conservée
-comme artefact du workflow, puis attachée à la release GitHub du tag (créée avec
-des notes générées si elle n'existe pas encore). Un lancement manuel du workflow
-produit seulement l'artefact, sans toucher aux releases.
+[`.github/workflows/release.yml`](.github/workflows/release.yml) : la suite de
+tests est rejouée, puis **deux binaires** sont construits avec le numéro du tag
+— l'AppImage sur Ubuntu et le `.exe` sur Windows, chacun conservé comme artefact
+du workflow. Une troisième tâche attend les deux et les attache à la release
+GitHub du tag, créée avec des notes générées si elle n'existe pas encore. Un
+lancement manuel du workflow produit seulement les artefacts, sans toucher aux
+releases.
+
+Si l'une des deux constructions échoue, aucune release n'est créée : c'est
+volontaire, une version à moitié publiée serait pire que pas de version.
 
 ```bash
 git tag v1.0.0
@@ -864,7 +873,7 @@ translations/         Catalogues de traduction (.ts source, .qm compilé)
 tools/                Compilation des .ts en .qm, builds AppImage et Windows
 tests/                Suite de tests hors écran (pytest)
 docs/images/          Captures d'écran utilisées par ce README
-.github/workflows/    Intégration continue (tests, qualité, AppImage des releases)
+.github/workflows/    Intégration continue (tests, qualité, releases Linux/Windows)
 requirements.txt      Dépendances d'exécution
 requirements-dev.txt  Dépendances de développement (pytest, couverture, ruff)
 pyproject.toml        Règles de ruff et seuil de couverture
