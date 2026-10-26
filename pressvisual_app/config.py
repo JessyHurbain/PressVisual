@@ -13,7 +13,12 @@ from PyQt6.QtGui import QColor
 
 from .constants import APP_NAME
 from .i18n import LANGUAGE_AUTO, SUPPORTED_LANGUAGES, _t
-from .keymap import DISPLAY_MODES, KEYBOARD_LAYOUTS, POSITION_CHOICES
+from .keymap import (
+    DISPLAY_MODES,
+    KEYBOARD_LAYOUTS,
+    POSITION_CHOICES,
+    TRANSITIONS,
+)
 
 #: Couleurs personnalisables de l'overlay (format ``#RRGGBB`` ou ``#AARRGGBB``).
 APPEARANCE_COLOR_FIELDS: tuple[str, ...] = (
@@ -42,6 +47,8 @@ APPEARANCE_CONFIG_KEYS: tuple[str, ...] = (
     "display_mode",
     "keyboard_layout",
     "show_mouse",
+    "transition",
+    "fade_out_ms",
 )
 # ---------------------------------------------------------------------------
 # Configuration
@@ -72,6 +79,10 @@ class Config:
     keyboard_layout: str = "azerty"    # azerty | qwerty
     show_mouse: bool = True            # souris à côté du clavier (mode keyboard)
     keyboard_scale: float = 1.0        # taille du clavier, réglée à la souris
+    #: Transition de la bulle (apparition et disparition) : fade (fondu),
+    #: slide / slide-up / slide-left / slide-right (glissements), zoom
+    #: (rétrécissement), none (immédiate).
+    transition: str = "fade"
     #: Position libre mémorisée : (x, y, largeur, hauteur).
     free_position: Optional[tuple[int, int, int, int]] = None
     language: str = LANGUAGE_AUTO       # auto (système) | fr | en
@@ -240,6 +251,16 @@ class Config:
                 ).format(value=repr(free))
             )
             self.free_position = None
+
+        transition = str(self.transition or "fade").strip().lower()
+        if transition not in TRANSITIONS:
+            notes.append(
+                _t("transition inconnue ({value}) : « fade » utilisée.").format(
+                    value=repr(self.transition)
+                )
+            )
+            transition = "fade"
+        self.transition = transition
 
         mode = str(self.display_mode or "overlay").strip().lower()
         if mode not in DISPLAY_MODES:

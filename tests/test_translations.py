@@ -177,8 +177,22 @@ def test_display_settings_are_translated(english, qapp, config):
             for index in range(dialog.layout_combo.count())
         ]
 
+        transitions = [
+            dialog.transition_combo.itemText(index)
+            for index in range(dialog.transition_combo.count())
+        ]
+
         assert labels == ["Standard overlay", "Full keyboard"]
         assert layouts == ["AZERTY (French)", "QWERTY (English)"]
+        assert transitions == [
+            "Fade",
+            "Slide down",
+            "Slide up",
+            "Slide left",
+            "Slide right",
+            "Zoom",
+            "None",
+        ]
         assert dialog.show_mouse.text() == "Show the mouse next to the keyboard"
     finally:
         dialog.deleteLater()

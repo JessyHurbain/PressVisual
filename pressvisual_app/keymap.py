@@ -32,6 +32,27 @@ DISPLAY_MODES: tuple[str, ...] = ("overlay", "keyboard")
 #: Dispositions de clavier proposées pour le mode « clavier complet ».
 KEYBOARD_LAYOUTS: tuple[str, ...] = ("azerty", "qwerty")
 
+#: Transitions de la bulle, utilisées à l'apparition comme à la disparition.
+TRANSITIONS: tuple[str, ...] = (
+    "fade",
+    "slide",
+    "slide-up",
+    "slide-left",
+    "slide-right",
+    "zoom",
+    "none",
+)
+
+TRANSITION_LABELS: dict[str, str] = {
+    "fade": "Fondu",
+    "slide": "Glissement vers le bas",
+    "slide-up": "Glissement vers le haut",
+    "slide-left": "Glissement vers la gauche",
+    "slide-right": "Glissement vers la droite",
+    "zoom": "Zoom",
+    "none": "Aucune",
+}
+
 #: Ordre d'affichage des modificateurs dans une combinaison.
 MODIFIER_ORDER: tuple[str, ...] = ("ctrl", "alt", "shift", "win")
 

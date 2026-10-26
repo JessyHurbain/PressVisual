@@ -516,6 +516,46 @@
         <translation>Unknown position ({value}): "bottom-right" used.</translation>
     </message>
     <message>
+        <source>transition inconnue ({value}) : « fade » utilisée.</source>
+        <translation>Unknown transition ({value}): "fade" used.</translation>
+    </message>
+    <message>
+        <source>Fondu</source>
+        <translation>Fade</translation>
+    </message>
+    <message>
+        <source>Glissement vers le bas</source>
+        <translation>Slide down</translation>
+    </message>
+    <message>
+        <source>Glissement vers le haut</source>
+        <translation>Slide up</translation>
+    </message>
+    <message>
+        <source>Glissement vers la gauche</source>
+        <translation>Slide left</translation>
+    </message>
+    <message>
+        <source>Glissement vers la droite</source>
+        <translation>Slide right</translation>
+    </message>
+    <message>
+        <source>Zoom</source>
+        <translation>Zoom</translation>
+    </message>
+    <message>
+        <source>Aucune</source>
+        <translation>None</translation>
+    </message>
+    <message>
+        <source>Transition de la bulle</source>
+        <translation>Overlay transition</translation>
+    </message>
+    <message>
+        <source>Durée de la disparition</source>
+        <translation>Exit duration</translation>
+    </message>
+    <message>
         <source>position initiale : top-left, top-right, bottom-left, bottom-right ou bottom-center</source>
         <translation>initial position: top-left, top-right, bottom-left, bottom-right or bottom-center</translation>
     </message>

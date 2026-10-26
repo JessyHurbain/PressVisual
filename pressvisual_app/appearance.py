@@ -45,6 +45,7 @@ from .constants import APP_NAME
 from .i18n import LANGUAGE_AUTO, _t
 from .icon import build_app_icon
 from .keyboard import InputView
+from .keymap import TRANSITIONS, TRANSITION_LABELS
 from .theme import Palette, _config_color
 from .widgets import KeyRow
 
@@ -435,6 +436,22 @@ class AppearanceDialog(QDialog):
         )
         self.show_mouse.setChecked(bool(config.show_mouse))
         display_form.addRow(self.show_mouse)
+
+        self.transition_combo = QComboBox(display_group)
+        for value in TRANSITIONS:
+            self.transition_combo.addItem(_t(TRANSITION_LABELS[value]), value)
+        index = self.transition_combo.findData(
+            str(config.transition).strip().lower()
+        )
+        self.transition_combo.setCurrentIndex(index if index >= 0 else 0)
+        display_form.addRow(_t("Transition de la bulle"), self.transition_combo)
+
+        self.transition_duration = QSpinBox(display_group)
+        self.transition_duration.setRange(0, 3000)
+        self.transition_duration.setSingleStep(50)
+        self.transition_duration.setSuffix(" ms")
+        self.transition_duration.setValue(int(config.fade_out_ms))
+        display_form.addRow(_t("Durée de la disparition"), self.transition_duration)
         outer.addWidget(display_group)
 
         interface_group = QGroupBox(_t("Interface"), self)
@@ -496,6 +513,8 @@ class AppearanceDialog(QDialog):
         self.mode_combo.currentIndexChanged.connect(self._refresh_preview)
         self.layout_combo.currentIndexChanged.connect(self._refresh_preview)
         self.show_mouse.toggled.connect(self._refresh_preview)
+        self.transition_combo.currentIndexChanged.connect(self._refresh_preview)
+        self.transition_duration.valueChanged.connect(self._refresh_preview)
 
         self._refresh_preview()
         self.adjustSize()
@@ -519,6 +538,8 @@ class AppearanceDialog(QDialog):
             "display_mode": self.mode_combo.currentData() or "overlay",
             "keyboard_layout": self.layout_combo.currentData() or "azerty",
             "show_mouse": self.show_mouse.isChecked(),
+            "transition": self.transition_combo.currentData() or "fade",
+            "fade_out_ms": self.transition_duration.value(),
             "opacity": self.opacity_slider.value() / 100.0,
             "font_family": family,
             "font_size": self.font_size.value(),
@@ -564,6 +585,9 @@ class AppearanceDialog(QDialog):
             index = self.layout_combo.findData(defaults.keyboard_layout)
             self.layout_combo.setCurrentIndex(index if index >= 0 else 0)
             self.show_mouse.setChecked(defaults.show_mouse)
+            index = self.transition_combo.findData(defaults.transition)
+            self.transition_combo.setCurrentIndex(index if index >= 0 else 0)
+            self.transition_duration.setValue(int(defaults.fade_out_ms))
         finally:
             self._updating = False
         self._refresh_preview()

@@ -16,6 +16,7 @@ from PyQt6.QtCore import (
     QSize,
     Qt,
     QTimer,
+    QVariantAnimation,
     pyqtSignal,
 )
 from PyQt6.QtGui import (
@@ -55,6 +56,18 @@ from .keymap import (
 from .mouse import MOUSE_BUTTONS, MOUSE_SCROLL_FLASH_MS
 from .theme import Palette, _with_alpha
 from .widgets import KeyRow
+
+#: Sens de sortie des transitions glissées, en fraction de la taille de la
+#: bulle : (dx, dy). L'apparition repart du même bord.
+SLIDE_DIRECTIONS: dict[str, tuple[float, float]] = {
+    "slide": (0.0, 1.0),        # sort par le bas
+    "slide-up": (0.0, -1.0),    # sort par le haut
+    "slide-left": (-1.0, 0.0),  # sort par la gauche
+    "slide-right": (1.0, 0.0),  # sort par la droite
+}
+
+#: Échelle atteinte par la transition « zoom » (la bulle rétrécit en sortant).
+ZOOM_SCALE = 0.9
 
 #: Longueur maximale du tampon de texte affiché.
 MAX_TEXT_LENGTH = 200
@@ -123,6 +136,12 @@ class Overlay(QWidget):
         self._resize_start_scale = 1.0
         self._resize_start_size = QSize(0, 0)
         self._fade_target = "idle"
+        self._slide_target = "idle"
+        # Transition en cours : "slide" (déplacement) ou "zoom" (échelle).
+        self._slide_mode = ""
+        self._slide_delta = QPoint(0, 0)
+        self._zoom_base: Optional[QRect] = None
+        self._zoom_factor = 1.0
 
         # Ancrage : bords conservés lors des changements de taille (coin
         # haut/bas, gauche/centre/droite).
@@ -134,6 +153,13 @@ class Overlay(QWidget):
         # --- Animations et minuteries ------------------------------------
         self._fade = QPropertyAnimation(self, b"windowOpacity", self)
         self._fade.finished.connect(self._on_fade_finished)
+        # Glissement et zoom : la bulle sort par un bord (ou rétrécit) puis
+        # revient. Le déplacement et l'échelle sont appliqués nous-mêmes, pour
+        # reprendre la main sur la géométrie dès l'animation terminée.
+        self._slide = QVariantAnimation(self)
+        self._slide.valueChanged.connect(self._slide_to)
+        self._slide.finished.connect(self._on_slide_finished)
+        self._slide_origin: Optional[QPoint] = None
 
         self._idle_timer = QTimer(self)
         self._idle_timer.setSingleShot(True)
@@ -160,6 +186,7 @@ class Overlay(QWidget):
         self._visual.set_mode_visible(self._mode == "keyboard")
 
         self._anchoring_ready = False
+        self._snapping = False
         self.resize(320, 64)
         if not self._restore_free_position():
             self._reset_anchor_position(config.position)
@@ -358,8 +385,28 @@ class Overlay(QWidget):
         # position (Qt différe parfois l'application de la taille) : on
         # réapplique l'ancrage avec la taille définitive.
         super().resizeEvent(event)
-        if self._anchoring_ready and not self._dragging:
+        # Pendant un zoom, la taille change volontairement : c'est
+        # l'animation qui place la fenêtre, pas l'ancrage.
+        if self._anchoring_ready and not self._dragging and not self._slide_mode:
             self._apply_anchor()
+
+    def moveEvent(self, event) -> None:  # noqa: N802 - API Qt
+        super().moveEvent(event)
+        # La plateforme graphique applique parfois en différé la géométrie
+        # d'une animation terminée : une fenêtre masquée est ramenée à sa
+        # place pour que la prochaine apparition parte du bon endroit.
+        if (
+            self._anchoring_ready
+            and not self.isVisible()
+            and not self._dragging
+            and not self._slide_mode
+            and not self._snapping
+        ):
+            self._snapping = True
+            try:
+                self._apply_anchor()
+            finally:
+                self._snapping = False
 
     def _resize_to(self, cursor: QPoint) -> None:
         """Règle la taille du clavier d'après le glisser de la poignée.
@@ -462,14 +509,16 @@ class Overlay(QWidget):
         """Empêche la bulle de s'effacer pendant un déplacement manuel.
 
         Le minuteur de disparition est suspendu tant que le bouton reste
-        enfoncé, et un fondu déjà commencé est annulé.
+        enfoncé, et une transition déjà commencée est annulée.
         """
         self._idle_timer.stop()
-        if self._fade_target != "out":
+        if not self._transition_running("out"):
             return
         self._fade.stop()
+        self._slide.stop()
         self._fade_target = "idle"
-        self.setWindowOpacity(1.0)
+        self._slide_target = "idle"
+        self._reset_transition_state()
 
     def _restore_free_position(self) -> bool:
         """Replace la bulle à la position libre mémorisée, si elle existe."""
@@ -629,57 +678,253 @@ class Overlay(QWidget):
         self._idle_timer.start(int(self._cfg.display_duration * 1000))
         self._fade_in()
 
-    def _fade_in(self) -> None:
-        if (
-            self._fade.state() == QAbstractAnimation.State.Running
-            and self._fade_target == "in"
-        ):
-            return
+    def _transition_running(self, direction: str) -> bool:
+        """Une transition (fondu, glissement ou zoom) est-elle en cours ?"""
+        running = QAbstractAnimation.State.Running
+        return (
+            self._fade.state() == running and self._fade_target == direction
+        ) or (
+            self._slide.state() == running and self._slide_target == direction
+        )
 
-        self._fade_target = "in"
-        if self.isVisible() and self.windowOpacity() >= 0.999:
-            # Interrompt un éventuel fondu de disparition qui vient de débuter.
-            self._fade.stop()
+    def _transition_duration(self) -> int:
+        """Durée de la transition de disparition, en millisecondes."""
+        if self._cfg.transition == "none":
+            return 0
+        return max(0, int(self._cfg.fade_out_ms))
+
+    def _entry_duration(self) -> int:
+        """Durée de l'apparition.
+
+        Elle reprend la même transition mais reste brève (``fade_in_ms``)
+        pour qu'une frappe allume la bulle sans délai perceptible ; une
+        durée de disparition plus courte s'applique telle quelle.
+        """
+        duration = self._transition_duration()
+        if duration <= 0:
+            return 0
+        return min(max(0, int(self._cfg.fade_in_ms)), duration)
+
+    def _fade_in(self) -> None:
+        """Affiche la bulle avec la transition d'apparition choisie."""
+        if self._transition_running("in"):
             return
 
         self._fade.stop()
-        if not self.isVisible():
-            self.setWindowOpacity(0.0)
-            self._relayout()
-            self.show()
-        self._fade.setDuration(self._cfg.fade_in_ms)
-        self._fade.setStartValue(max(0.0, self.windowOpacity()))
+        self._slide.stop()
+        self._fade_target = "in"
+        self._slide_target = "idle"
+        # Une disparition en cours est annulée : la bulle retrouve tout de
+        # suite sa position et sa taille, sans rester à moitié sortie.
+        self._reset_transition_state()
+
+        if self.isVisible():
+            return
+
+        self._relayout()
+        self.show()
+        self._start_entry()
+
+    def _start_entry(self) -> None:
+        """Anime l'apparition depuis le bord choisi, ou par zoom."""
+        duration = self._entry_duration()
+        transition = self._cfg.transition
+        if duration <= 0 or transition == "none":
+            self.setWindowOpacity(1.0)
+            return
+
+        if transition in SLIDE_DIRECTIONS:
+            dx, dy = SLIDE_DIRECTIONS[transition]
+            self._slide_mode = "slide"
+            self._slide_origin = self.pos()
+            self._slide_delta = QPoint(
+                int(round(dx * self.width())), int(round(dy * self.height()))
+            )
+            self._slide.setDuration(duration)
+            self._slide.setStartValue(1.0)
+            self._slide.setEndValue(0.0)
+            self._slide.setEasingCurve(QEasingCurve.Type.OutCubic)
+            self._slide_to(1.0)
+            self._slide_target = "in"
+            self._slide.start()
+            return
+
+        if transition == "zoom":
+            self._slide_mode = "zoom"
+            self._zoom_base = QRect(self.geometry())
+            self._zoom_factor = ZOOM_SCALE
+            # La taille minimale imposée par le contenu empêcherait de
+            # rétrécir : elle est relâchée le temps du zoom.
+            self.setMinimumSize(1, 1)
+            self._slide.setDuration(duration)
+            self._slide.setStartValue(1.0)
+            self._slide.setEndValue(0.0)
+            self._slide.setEasingCurve(QEasingCurve.Type.OutCubic)
+            self._slide_to(1.0)
+            self._slide_target = "in"
+            self._slide.start()
+            return
+
+        self.setWindowOpacity(0.0)
+        self._fade.setDuration(duration)
+        self._fade.setStartValue(0.0)
         self._fade.setEndValue(1.0)
         self._fade.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._fade.start()
 
     def _fade_out(self) -> None:
+        """Fait disparaître la bulle selon la transition configurée."""
         if not self.isVisible():
             return
         self._fade.stop()
-        self._fade_target = "out"
+        self._slide.stop()
+        self._fade_target = "idle"
+        self._slide_target = "idle"
         self._idle_timer.stop()
-        self._fade.setDuration(self._cfg.fade_out_ms)
+        # La sortie part toujours de la bulle en place, à taille pleine :
+        # une apparition interrompue ne doit pas gauchir le point de départ.
+        self._reset_transition_state()
+
+        duration = self._transition_duration()
+        transition = self._cfg.transition
+        if duration == 0 or transition == "none":
+            self._finish_hiding()
+            return
+
+        if transition in SLIDE_DIRECTIONS:
+            dx, dy = SLIDE_DIRECTIONS[transition]
+            self._slide_mode = "slide"
+            self._slide_origin = self.pos()
+            self._slide_delta = QPoint(
+                int(round(dx * self.width())), int(round(dy * self.height()))
+            )
+            self._slide.setDuration(duration)
+            self._slide.setStartValue(0.0)
+            self._slide.setEndValue(1.0)
+            self._slide.setEasingCurve(QEasingCurve.Type.InCubic)
+            self._slide_target = "out"
+            self._slide.start()
+            return
+
+        if transition == "zoom":
+            self._slide_mode = "zoom"
+            self._zoom_base = QRect(self.geometry())
+            self._zoom_factor = ZOOM_SCALE
+            self.setMinimumSize(1, 1)
+            self._slide.setDuration(duration)
+            self._slide.setStartValue(0.0)
+            self._slide.setEndValue(1.0)
+            self._slide.setEasingCurve(QEasingCurve.Type.InCubic)
+            self._slide_target = "out"
+            self._slide.start()
+            return
+
+        self._fade_target = "out"
+        self._fade.setDuration(duration)
         self._fade.setStartValue(self.windowOpacity())
         self._fade.setEndValue(0.0)
         self._fade.setEasingCurve(QEasingCurve.Type.InCubic)
         self._fade.start()
 
+    def _end_zoom(self) -> None:
+        """Rend à la bulle sa taille pleine, après un zoom."""
+        if self._slide_mode != "zoom":
+            return
+        if self._zoom_base is not None:
+            self.setGeometry(self._zoom_base)
+        self._zoom_base = None
+        # Rend la main au layout, qui réimpose la taille minimale du contenu.
+        self.setMinimumSize(0, 0)
+
+    def _reset_transition_state(self) -> None:
+        """Remet la bulle à sa place et à sa taille, opacité pleine."""
+        self._end_zoom()
+        self.setWindowOpacity(1.0)
+        self._slide_mode = ""
+        self._slide_delta = QPoint(0, 0)
+        self._slide_origin = None
+        if self.isVisible():
+            self._apply_anchor()
+
     def _on_fade_finished(self) -> None:
         if self._fade_target != "out":
             return
+        self._finish_hiding()
+
+    def _on_slide_finished(self) -> None:
+        if self._slide_target == "out":
+            self._finish_hiding()
+            return
+        self._slide_target = "idle"
+        self._reset_transition_state()
+
+    def _finish_hiding(self) -> None:
+        """Termine la disparition : fenêtre masquée, contenu éteint."""
+        self._fade.stop()
+        self._slide.stop()
+        self._fade_target = "idle"
+        self._slide_target = "idle"
         self.hide()
+        # Un zoom a réduit la fenêtre : elle retrouve sa taille pleine avant
+        # de revenir à sa position d'ancrage.
+        self._end_zoom()
+        self._slide_mode = ""
+        self._slide_delta = QPoint(0, 0)
+        self._slide_origin = None
         self.setWindowOpacity(1.0)
         self._clear_rows()
         self._clear_keyboard()
+        # Après un glissement, la bulle reprend sa place pour la prochaine
+        # fois ; un second passage rattrape le déplacement que la plateforme
+        # graphique applique encore après la fin de l'animation.
+        self._apply_anchor()
+        QTimer.singleShot(0, self._restore_position)
+
+    def _restore_position(self) -> None:
+        """Remet la bulle à sa position d'ancrage, sans la réafficher."""
+        if not self.isVisible():
+            self._apply_anchor()
+
+    def _slide_to(self, progress: float) -> None:
+        """Applique l'avancement de la transition (0 = bulle en place)."""
+        value = float(progress)
+        if self._slide_mode == "zoom":
+            base = self._zoom_base
+            if base is None:
+                return
+            factor = 1.0 + (self._zoom_factor - 1.0) * value
+            width = max(1, int(round(base.width() * factor)))
+            height = max(1, int(round(base.height() * factor)))
+            self.setGeometry(
+                base.x() + (base.width() - width) // 2,
+                base.y() + (base.height() - height) // 2,
+                width,
+                height,
+            )
+            self.setWindowOpacity(max(0.0, min(1.0, 1.0 - value)))
+            return
+
+        if self._slide_mode != "slide" or self._slide_origin is None:
+            return
+        self.move(
+            self._slide_origin.x() + int(round(self._slide_delta.x() * value)),
+            self._slide_origin.y() + int(round(self._slide_delta.y() * value)),
+        )
 
     def _hide_now(self) -> None:
         self._fade.stop()
+        self._slide.stop()
         self._fade_target = "idle"
+        self._slide_target = "idle"
+        self._end_zoom()
+        self._slide_mode = ""
+        self._slide_delta = QPoint(0, 0)
+        self._slide_origin = None
         self._idle_timer.stop()
         self._typing_timer.stop()
         self.hide()
         self.setWindowOpacity(1.0)
+        self._apply_anchor()
 
     # ------------------------------------------------------------------
     # Lignes de l'overlay
