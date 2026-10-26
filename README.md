@@ -885,9 +885,15 @@ requirements.txt      Dépendances d'exécution
 requirements-dev.txt  Dépendances de développement (pytest, couverture, ruff)
 pyproject.toml        Règles de ruff et seuil de couverture
 README.md             Ce document
+LICENSE               Licence MIT du projet
 ```
 
 ## Licence
 
-Code fourni librement pour un usage personnel ou professionnel. Les polices et
-bibliothèques tierces conservent leurs licences respectives.
+PressVisual est distribué sous [licence MIT](LICENSE) : usage personnel ou
+professionnel, modification et redistribution sont libres, à condition de
+conserver l'avis de copyright. Le logiciel est fourni sans garantie.
+
+Les polices et bibliothèques tierces (Qt, PyQt6, pynput) conservent leurs
+propres licences ; les captures d'écran de ce README montrent l'application
+telle qu'elle s'exécute localement.
