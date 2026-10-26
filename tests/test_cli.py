@@ -199,3 +199,41 @@ def test_default_config_path_points_to_config_json():
 
     assert path.name == "config.json"
     assert path.is_absolute()
+
+
+def test_frozen_macos_bundle_stores_config_in_application_support(
+    monkeypatch, tmp_path
+):
+    """Un .app installé dans /Applications n'est pas inscriptible.
+
+    La configuration doit donc aller dans le dossier utilisateur, et le dossier
+    doit exister avant la première écriture.
+    """
+    bundle = tmp_path / "Applications" / "PressVisual.app"
+    executable = bundle / "Contents" / "MacOS" / "PressVisual"
+    executable.parent.mkdir(parents=True)
+    executable.write_text("")
+    home = tmp_path / "home"
+    home.mkdir()
+
+    monkeypatch.setattr(cli_module.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(cli_module.sys, "platform", "darwin")
+    monkeypatch.setattr(cli_module.sys, "executable", str(executable))
+    monkeypatch.setenv("HOME", str(home))
+
+    path = pressvisual._default_config_path()
+
+    expected = home / "Library" / "Application Support" / "PressVisual"
+    assert path == expected / "config.json"
+    assert path.parent.is_dir()
+
+
+def test_frozen_windows_executable_keeps_config_beside_it(monkeypatch, tmp_path):
+    executable = tmp_path / "PressVisual.exe"
+    executable.write_text("")
+
+    monkeypatch.setattr(cli_module.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(cli_module.sys, "platform", "win32")
+    monkeypatch.setattr(cli_module.sys, "executable", str(executable))
+
+    assert pressvisual._default_config_path() == tmp_path / "config.json"

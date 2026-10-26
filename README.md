@@ -710,14 +710,60 @@ avec `--config "%APPDATA%\pressvisual-config.json"`.
 
 ### macOS — `PressVisual.app`
 
+macOS exige un bundle `.app` : sans `--windowed`, PyInstaller ne produit qu'un
+exécutable Unix, sans `Info.plist`, sans icône dans le Dock et sans la signature
+qui conditionne le lancement sur Apple Silicon.
+
+[`tools/build_macos.sh`](tools/build_macos.sh) enchaîne toutes les étapes :
+
 ```bash
-python -m PyInstaller --noconfirm --clean --onefile --windowed --name PressVisual pressvisual.py
+bash tools/build_macos.sh
+# → dist/PressVisual-<version>-macos-<architecture>.dmg
 ```
 
-Le bundle est créé dans `dist/PressVisual.app`. Au premier lancement, macOS demande
-l'autorisation de contrôler le clavier : acceptez, ou ajoutez PressVisual dans
-**Réglages Système → Confidentialité et sécurité → Accessibilité**, puis
-relancez l'application. Pour distribuer le bundle, signez-le et notarisez-le.
+Le script crée un environnement virtuel dans `build/macos/`, y installe PyQt6,
+pynput et PyInstaller, compile les traductions, dessine l'icône `.icns` avec
+l'application elle-même (les dix tailles réclamées par `iconutil`), empaquette
+le bundle avec les imports cachés `pynput.keyboard._darwin` et
+`pynput.mouse._darwin`, renseigne la version et le copyright dans l'`Info.plist`,
+puis signe le bundle et fabrique l'image disque. Celle-ci contient
+l'application et un lien vers `/Applications` : il suffit de la glisser.
+
+```bash
+FORMAT=zip bash tools/build_macos.sh       # archive .zip au lieu du .dmg
+VERSION=1.0.0 bash tools/build_macos.sh    # version forcée (défaut : git describe)
+SKIP_PYINSTALLER=1 bash tools/build_macos.sh   # réemballe un bundle déjà construit
+CODESIGN_ID="Developer ID Application: …" bash tools/build_macos.sh
+```
+
+`PYTHON=python3.12` choisit l'interpréteur, les dépendances ne sont
+réinstallées que si `requirements.txt` change.
+
+**Architecture.** Le build cible la machine qui l'exécute — `arm64` sur Apple
+Silicon, `x86_64` sur Intel — et le nom du fichier le mentionne. Il n'existe pas
+de build universel : construisez une image disque par architecture.
+
+**Premier lancement.** macOS demande l'autorisation de surveiller le clavier :
+acceptez, ou ajoutez PressVisual dans **Réglages Système → Confidentialité et
+sécurité → Accessibilité**, puis relancez l'application. Sans cette
+autorisation, la bulle s'affiche mais reste vide.
+
+**Gatekeeper.** Une image disque non notariée est mise en quarantaine au
+téléchargement. Le cas échéant :
+
+```bash
+xattr -dr com.apple.quarantine /Applications/PressVisual.app
+```
+
+ou *Ouvrir* par le menu contextuel. Pour une distribution publique, signez avec
+un certificat Developer ID et notarisez (`notarytool`) ; `CODESIGN_ID` sert
+précisément à cela.
+
+**Configuration.** Contrairement à Windows et Linux, un bundle `.app` n'écrit pas
+à côté de son exécutable : les réglages vont dans
+`~/Library/Application Support/PressVisual/config.json`, y compris lorsque
+l'application est installée dans `/Applications`. `--config` impose un autre
+emplacement.
 
 ### Linux
 
@@ -776,6 +822,14 @@ releases.
 Si l'une des deux constructions échoue, aucune release n'est créée : c'est
 volontaire, une version à moitié publiée serait pire que pas de version.
 
+macOS n'est pas construit par ce workflow : le `.dmg` doit être fabriqué sur une
+machine Apple avec [`tools/build_macos.sh`](tools/build_macos.sh), puis joint à
+la release :
+
+```bash
+gh release upload v1.0.0 dist/PressVisual-1.0.0-macos-arm64.dmg
+```
+
 ```bash
 git tag v1.0.0
 git push origin v1.0.0
@@ -801,7 +855,9 @@ git push origin v1.0.0
   distribuez une version `--onedir`.
 - Le fichier `config.json` n'est pas embarqué automatiquement dans le binaire :
   il est lu à côté de l'exécutable au démarrage, et le menu y enregistre le
-  dernier coin choisi.
+  dernier coin choisi. Le bundle macOS fait exception : ses réglages vont dans
+  `~/Library/Application Support/PressVisual/`, un `.app` installé dans
+  `/Applications` n'étant pas inscriptible.
 - Le dossier `translations/` doit être embarqué pour l'interface anglaise :
   ajoutez `--add-data "translations:translations"` (Windows :
   `--add-data "translations;translations"`). Sans lui, l'application reste en
@@ -877,7 +933,7 @@ pressvisual_app/      Code de l'application
   tray.py             Icône de notification et menu
   cli.py              Ligne de commande et démarrage
 translations/         Catalogues de traduction (.ts source, .qm compilé)
-tools/                Compilation des .ts en .qm, builds AppImage et Windows
+tools/                Compilation des .ts en .qm, builds AppImage, Windows et macOS
 tests/                Suite de tests hors écran (pytest)
 docs/images/          Captures d'écran utilisées par ce README
 .github/workflows/    Intégration continue (tests, qualité, releases Linux/Windows)

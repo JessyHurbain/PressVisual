@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import signal
 import sys
@@ -35,13 +36,30 @@ from .tray import TrayController
 # ---------------------------------------------------------------------------
 
 
+def _macos_config_path() -> Path:
+    """Configuration d'un bundle .app : dossier utilisateur « Application Support ».
+
+    Écrire à côté du ``.app`` ne conviendrait pas : déplacé dans
+    ``/Applications``, un bundle n'est pas inscriptible, et une application
+    lancée par le Finder n'a pas de console pour signaler l'échec. Les réglages
+    disparaîtraient donc en silence d'un lancement à l'autre.
+    """
+    directory = Path.home() / "Library" / "Application Support" / APP_NAME
+    # L'enregistrement d'un réglage ne crée pas les parents du fichier : le
+    # dossier est préparé ici, au premier lancement. Un refus (droits, disque)
+    # sera de toute façon signalé à la première écriture.
+    with contextlib.suppress(OSError):
+        directory.mkdir(parents=True, exist_ok=True)
+    return directory / "config.json"
+
+
 def _default_config_path() -> Path:
     """``config.json`` à côté du script ou de l'exécutable PyInstaller."""
     if getattr(sys, "frozen", False):
         executable = Path(sys.executable).resolve()
-        # macOS : PressVisual.app/Contents/MacOS/PressVisual -> dossier contenant le .app
+        # macOS : PressVisual.app/Contents/MacOS/PressVisual
         if sys.platform == "darwin" and executable.parent.name == "MacOS":
-            return executable.parents[3] / "config.json"
+            return _macos_config_path()
         return executable.parent / "config.json"
     return Path(__file__).resolve().parents[1] / "config.json"
 
