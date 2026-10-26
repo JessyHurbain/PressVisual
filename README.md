@@ -8,14 +8,22 @@ Elle est conçue pour les **captures d'écran**, les **tutoriels** et les
 **formations en ligne** : l'overlay est discret, élégant, toujours au premier
 plan, et n'apparaît que lorsqu'il y a quelque chose à montrer.
 
-```
-┌──────────────────────────────────┐
-│  [Ctrl] + [Maj] + [P]            │
-│  [b]                             │
-│  [o]                             │
-│  [Entrée]                        │
-└──────────────────────────────────┘
-```
+![Overlay PressVisual sur un bureau : combinaison Ctrl + Maj + P, touche E et clic droit](docs/images/overlay-standard.png)
+
+> *Les captures de cette page sont générées avec l'application elle-même ; le
+> fond de bureau et la fenêtre sont une illustration.*
+
+## Sommaire
+
+- [Fonctionnalités](#fonctionnalités)
+- [Installation](#installation) — [Tutoriel : première démonstration](#tutoriel--première-démonstration)
+- [Lancement](#lancement) — [Options de la ligne de commande](#options-de-la-ligne-de-commande)
+- [Utilisation](#utilisation) — [Transitions](#transitions-de-la-bulle),
+  [mode clavier](#mode-clavier-complet), [apparence](#personnaliser-lapparence),
+  [raccourcis](#raccourcis-globaux), [mode privé](#masquage-et-mode-privé)
+- [Configuration](#configuration) — [Détail des clés](#détail-des-clés)
+- [Langues](#langues) — [Empaqueter un exécutable](#empaqueter-en-exécutable-autonome)
+- [Dépannage](#dépannage) — [Tests](#tests) — [Structure du projet](#structure-du-projet)
 
 ## Fonctionnalités
 
@@ -29,8 +37,9 @@ plan, et n'apparaît que lorsqu'il y a quelque chose à montrer.
   permet de changer les couleurs, la police, l'opacité, les coins arrondis et
   les marges, puis d'enregistrer le tout dans la configuration.
 - **Fenêtre sans bordure**, toujours au premier plan, déplaçable au clic-glisser.
-- **Apparition immédiate**, maintien configurable (2 s par défaut), puis fondu
-  de disparition.
+- **Apparition et disparition animées** : fondu, glissements dans les quatre
+  directions, zoom ou disparition immédiate, avec la durée de votre choix ; le
+  maintien à l'écran reste configurable (2 s par défaut).
 - **Capture globale** du clavier et de la souris via `pynput`, dans un fil
   séparé : l'interface reste fluide même pendant une frappe rapide.
 - **Combinaisons de touches** affichées en badges :
@@ -79,7 +88,7 @@ plan, et n'apparaît que lorsqu'il y a quelque chose à montrer.
 
 ```bash
 # 1. Se placer dans le dossier du projet
-cd clavier
+cd pressvisual
 
 # 2. Créer un environnement virtuel
 python -m venv .venv
@@ -93,6 +102,77 @@ source .venv/bin/activate
 # 4. Installer les dépendances
 python -m pip install -r requirements.txt
 ```
+
+## Tutoriel : première démonstration
+
+De l'installation au premier clip, sans ouvrir le fichier de configuration.
+
+### 1. Lancer l'application
+
+```bash
+python pressvisual.py
+```
+
+Rien ne s'ouvre : c'est normal. L'overlay reste invisible tant qu'il n'y a rien
+à montrer, et l'icône PressVisual rejoint la zone de notification. Le terminal
+affiche les raccourcis globaux ; laissez-le ouvert pendant la démonstration.
+
+### 2. Taper et cliquer
+
+Appuyez sur quelques touches, puis cliquez : la bulle apparaît en bas à droite
+de l'écran, avec une pastille par touche et une par clic. Les modificateurs
+maintenus forment une combinaison (`Ctrl + Maj + P`), la molette s'agrège
+(`Scroll ↓ ×3`) et les boutons latéraux sont reconnus. Après la dernière entrée,
+la bulle reste affichée deux secondes puis s'efface avec la transition choisie.
+
+> Rien ne s'affiche ? Vérifiez que l'application a bien le droit d'écouter le
+> clavier sur votre système (voir [Dépannage](#dépannage)).
+
+### 3. Choisir le clavier complet
+
+Clic droit sur l'icône → **Personnaliser l'overlay…** → **Mode d'affichage** →
+**Clavier complet**, puis **Enregistrer**. La bulle affiche désormais un clavier
+AZERTY (ou QWERTY) et une souris : la touche s'allume tant qu'elle est
+enfoncée, le bouton de souris s'enfonce, et un cran de molette s'affiche à côté.
+
+![Mode clavier complet : Ctrl et A allumés, clic gauche et molette sur la souris](docs/images/overlay-keyboard.png)
+
+La taille du clavier se règle directement en glissant la poignée du coin bas
+droit de la bulle (60 % à 200 %), sans passer par les réglages.
+
+### 4. Ajuster l'apparence et les transitions
+
+La même fenêtre règle les couleurs, la police, l'opacité, les coins arrondis,
+la marge et la **transition de la bulle** (fondu, glissements, zoom ou aucune)
+avec sa durée. L'aperçu en bas applique chaque changement immédiatement et
+rejoue la transition en boucle, pour juger du rendu avant d'enregistrer.
+
+![Fenêtre Personnaliser l'overlay : couleurs, mise en forme, affichage et aperçu animé](docs/images/settings.png)
+
+**Enregistrer** applique et conserve les réglages : les valeurs sont écrites
+dans `config.json`, à côté de `pressvisual.py` (ou à l'emplacement donné à
+`--config`). Au prochain lancement, l'overlay reprend exactement cette
+apparence.
+
+### 5. Placer la bulle où elle gêne le moins
+
+Glissez la bulle à la souris pour la poser où vous voulez : la position est
+mémorisée au redémarrage. Le sous-menu **Position de l'overlay** de l'icône
+propose aussi les quatre coins et le bas centre.
+
+### 6. Pendant la capture
+
+| Geste | Effet |
+| --- | --- |
+| `Ctrl + F12` | Masquer l'overlay et suspendre la capture (mode privé). |
+| `Ctrl + F10` | Remplacer les caractères par des points (`••••••`). |
+| `Ctrl + F11` | Rendre la bulle transparente aux clics (click-through). |
+| `Ctrl + F9` | Quitter PressVisual. |
+
+![Mode masqué : les caractères saisis apparaissent sous forme de points](docs/images/overlay-masked.png)
+
+Ces raccourcis fonctionnent même quand PressVisual n'a pas le focus ; ils se
+modifient dans `config.json` (voir [Raccourcis globaux](#raccourcis-globaux)).
 
 ## Tests
 
@@ -244,6 +324,8 @@ La fenêtre de personnalisation rejoue la transition en boucle dans son
 **Aperçu** : la bulle sort puis revient à la cadence choisie, ce qui permet de
 comparer les styles et d'ajuster la durée sans quitter les réglages.
 
+![Glissement vers le bas : la bulle sort par le bas sur fade_out_ms](docs/images/transition-slide.png)
+
 ### Mode clavier complet
 
 Avec `"display_mode": "keyboard"`, la bulle affiche un **clavier compact** à
@@ -356,9 +438,12 @@ utilisez le menu de l'icône de notification).
 ### Zone de notification
 
 Un clic sur l'icône affiche ou masque l'overlay. Le menu contextuel (clic droit)
-donne accès à toutes les options, notamment **Quitter**. Si votre système
-n'affiche pas les icônes de notification, utilisez `Ctrl + F9` (ou `Ctrl + C`
-dans le terminal) pour quitter.
+donne accès à toutes les options, notamment **Quitter**.
+
+![Menu de l'icône : afficher, clics traversants, masquage, apparence, position, quitter](docs/images/tray-menu.png)
+
+Si votre système n'affiche pas les icônes de notification, utilisez
+`Ctrl + F9` (ou `Ctrl + C` dans le terminal) pour quitter.
 
 ## Configuration
 
@@ -686,6 +771,7 @@ pressvisual_app/      Code de l'application
 translations/         Catalogues de traduction (.ts source, .qm compilé)
 tools/                Compilation des .ts en .qm (sans lrelease)
 tests/                Suite de tests hors écran (pytest)
+docs/images/          Captures d'écran utilisées par ce README
 .github/workflows/    Intégration continue (compilation + tests)
 requirements.txt      Dépendances d'exécution
 requirements-dev.txt  Dépendances de développement (pytest)
