@@ -667,6 +667,31 @@ Avec une icône personnalisée (fichier `.ico` ou `.icns`) :
 python -m PyInstaller --noconfirm --clean --onefile --windowed --name PressVisual --icon mon-icone.ico pressvisual.py
 ```
 
+#### Script de build
+
+[`tools/build_windows.ps1`](tools/build_windows.ps1) enchaîne ces étapes à votre
+place : environnement virtuel isolé dans `build\windows\`, traductions
+compilées, icône `.ico` dessinée par l'application, empaquetage puis livraison
+dans `dist\`.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build_windows.ps1
+# → dist\PressVisual-<version>-win64.zip  (dossier autonome compressé)
+```
+
+Le format par défaut est le dossier autonome : il démarre plus vite et attire
+moins de faux positifs antivirus que l'exécutable unique. Pour un fichier `.exe`
+seul :
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build_windows.ps1 -OneFile
+# → dist\PressVisual-<version>-win64.exe
+```
+
+Options : `-Version 1.0.0` (sinon `git describe`), `-SkipInstall` pour réutiliser
+l'environnement déjà créé, `-Python` pour choisir l'interpréteur. Les dépendances
+ne sont réinstallées que si `requirements.txt` change.
+
 Placez `config.json` **à côté de l'exécutable** si vous voulez une configuration
 persistante. Le coin choisi dans le menu y est enregistré automatiquement ; dans
 un dossier protégé en écriture (`C:\Program Files`, par exemple), lancez plutôt
@@ -836,7 +861,7 @@ pressvisual_app/      Code de l'application
   tray.py             Icône de notification et menu
   cli.py              Ligne de commande et démarrage
 translations/         Catalogues de traduction (.ts source, .qm compilé)
-tools/                Compilation des .ts en .qm, script d'AppImage
+tools/                Compilation des .ts en .qm, builds AppImage et Windows
 tests/                Suite de tests hors écran (pytest)
 docs/images/          Captures d'écran utilisées par ce README
 .github/workflows/    Intégration continue (tests, qualité, AppImage des releases)
