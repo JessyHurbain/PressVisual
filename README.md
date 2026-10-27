@@ -228,6 +228,11 @@ qui ne sont **pas** testées séparément. Leurs changements sont bien dans la
 pointe vérifiée, mais rien ne dit que chacune passait les tests à son époque —
 c'est déjà ce que fait la CI, qui ne teste que le commit poussé.
 
+Quand il n'y en a pas plus de trois, il propose de les tester aussi : répondre
+`o` au terminal fait relancer la vérification complète pour chacune. La question
+n'est posée que sur un terminal — depuis un script ou une sortie redirigée,
+elle est simplement omise.
+
 ```bash
 git config --local core.hooksPath tools/git-hooks
 ```

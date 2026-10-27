@@ -13,6 +13,10 @@
 # dans la révision testée, mais rien ne dit que chacune passait les tests à son
 # époque. C'est déjà ce que fait la CI, qui ne teste que le commit poussé.
 #
+# Quand il n'y en a pas trop (PROMPT_MAX), le crochet le propose à l'écran : de
+# quoi rattraper une poussée de deux ou trois commits avant qu'elle ne parte.
+# Chaque révision retenue relance la vérification complète.
+#
 # La procédure appliquée est celle du dépôt courant (tools/check_ci.sh), sur les
 # sources de la révision vérifiée — une révision antérieure à ce script est donc
 # vérifiée elle aussi.
@@ -34,12 +38,38 @@ CLONE_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 
 #: Révisions détaillées par référence avant un « … et N autres ».
 LIST_MAX=5
+#: Révisions incluses au-delà desquelles le crochet ne propose plus de les tester
+#: une par une. Doit rester inférieur ou égal à LIST_MAX, qui plafonne le rapport.
+PROMPT_MAX=3
 
 note() { printf '[crochet] %s\n' "$1"; }
 
 # « b3d88b25 Vérifier la révision poussée » : de quoi reconnaître un commit.
 describe() {
     git -C "$CLONE_DIR" log -1 --format='%h %s' "$1"
+}
+
+# has_tty : y a-t-il un terminal auquel poser une question ?
+#
+# « -r /dev/tty » ne répond pas à la question : le fichier existe dès que le
+# système en fournit un, même pour un processus sans terminal, et son ouverture
+# échoue alors — ce qui interrompait la poussée. Seule une ouverture réelle fait
+# foi.
+has_tty() {
+    { true > /dev/tty; } 2>/dev/null
+}
+
+# contains <valeur> [liste...] : la valeur est-elle dans la liste ?
+contains() {
+    local needle=$1
+    shift
+    local value
+    for value in "$@"; do
+        if [[ $value == "$needle" ]]; then
+            return 0
+        fi
+    done
+    return 1
 }
 
 # ---------------------------------------------------------------------------
@@ -95,9 +125,11 @@ done <<<"$input"
 # Ce que la poussée envoie, et ce qui sera testé
 # ---------------------------------------------------------------------------
 
-#: Révisions à tester : les pointes annoncées, dédoublonnées (une branche et son
-#: étiquette peuvent désigner le même commit).
+#: Pointes annoncées, dédoublonnées : une branche et son étiquette peuvent
+#: désigner le même commit.
 VERIFIED=()
+#: Révisions contenues dans ces pointes, candidates à une vérification en plus.
+INCLUDED=()
 
 if ((${#TIPS[@]})); then
     for index in "${!TIPS[@]}"; do
@@ -106,7 +138,7 @@ if ((${#TIPS[@]})); then
         old=${OLDS[$index]}
 
         # Révisions que Git enverra pour cette référence : celles qui manquent au
-        # distant, ou tout ce qui est atteignable si le distant ne les a pas.
+        # distant, ou tout ce qui est atteignable s'il ne les a pas.
         if [[ -n $old ]] && git -C "$CLONE_DIR" cat-file -e "${old}^{commit}" 2>/dev/null; then
             sent=$(git -C "$CLONE_DIR" rev-list "$old..$tip")
         else
@@ -120,30 +152,30 @@ if ((${#TIPS[@]})); then
         if ((count > 1)); then
             included=$(printf '%s\n' "$sent" | grep -v -F -x "$tip")
             note "  non testées séparément : $((count - 1))"
-            printed=0
+            shown=0
             while read -r sha; do
                 if [[ -z $sha ]]; then
                     continue
                 fi
-                if ((printed >= LIST_MAX)); then
-                    note "    … et $((count - 1 - printed)) autre(s)"
-                    break
+                # Une révision incluse peut être la pointe d'une autre référence :
+                # elle est alors déjà testée, et n'est pas à proposer.
+                if ! contains "$sha" "${VERIFIED[@]}"; then
+                    if ! contains "$sha" "${INCLUDED[@]}"; then
+                        INCLUDED+=("$sha")
+                    fi
                 fi
-                note "    $(describe "$sha")"
-                printed=$((printed + 1))
+                if ((shown < LIST_MAX)); then
+                    note "    $(describe "$sha")"
+                    shown=$((shown + 1))
+                fi
             done <<<"$included"
+            if ((shown < count - 1)); then
+                note "    … et $((count - 1 - shown)) autre(s)"
+            fi
             note "  (leurs changements sont inclus dans la révision testée)"
         fi
 
-        duplicate=0
-        if ((${#VERIFIED[@]})); then
-            for known in "${VERIFIED[@]}"; do
-                if [[ $known == "$tip" ]]; then
-                    duplicate=1
-                fi
-            done
-        fi
-        if ((duplicate == 0)); then
+        if ! contains "$tip" "${VERIFIED[@]}"; then
             VERIFIED+=("$tip")
         fi
     done
@@ -152,6 +184,43 @@ fi
 if ((${#VERIFIED[@]} == 0)); then
     note "rien à vérifier : aucune révision n'est envoyée."
     exit 0
+fi
+
+# Révisions incluses qui ne sont pas déjà une pointe annoncée. Le tableau est lu
+# sans expansion vide, `set -u` refusant « ${tab[@]} » sur un tableau vide.
+EXTRA=()
+if ((${#INCLUDED[@]})); then
+    for sha in "${INCLUDED[@]}"; do
+        if ! contains "$sha" "${VERIFIED[@]}"; then
+            EXTRA+=("$sha")
+        fi
+    done
+fi
+
+# ---------------------------------------------------------------------------
+# Proposer de tester aussi les révisions incluses
+# ---------------------------------------------------------------------------
+
+# Uniquement sur un terminal : sans /dev/tty (envoi depuis un script, sortie
+# redirigée), personne ne répondrait et la poussée resterait bloquée.
+if ((${#EXTRA[@]})) && ((${#EXTRA[@]} <= PROMPT_MAX)) && has_tty; then
+    printf '[crochet] %s révision(s) incluse(s) ne sont pas testées : les tester aussi ?\n' \
+        "${#EXTRA[@]}" > /dev/tty
+    printf '[crochet] chacune relance la vérification complète. [o/N] ' > /dev/tty
+    answer=""
+    read -r answer < /dev/tty || answer=""
+    answer=$(printf '%s' "$answer" | tr '[:upper:]' '[:lower:]')
+    case $answer in
+        o | oui | y | yes)
+            note "révisions incluses retenues pour la vérification."
+            for sha in "${EXTRA[@]}"; do
+                VERIFIED+=("$sha")
+            done
+            ;;
+        *)
+            note "révisions incluses laissées de côté."
+            ;;
+    esac
 fi
 
 # ---------------------------------------------------------------------------
@@ -173,7 +242,7 @@ trap cleanup EXIT
 for revision in "${VERIFIED[@]}"; do
     # Une seule révision la plupart du temps : le rapport ci-dessus suffit.
     if ((${#VERIFIED[@]} > 1)); then
-        note "vérification de ${revision:0:8}"
+        note "vérification de $(describe "$revision")"
     fi
 
     WORKTREE=$(mktemp -d "${TMPDIR:-/tmp}/pressvisual-check-XXXXXX")
