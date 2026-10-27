@@ -133,11 +133,17 @@ class ColorButton(QPushButton):
 
 
 #: Cadence des étapes de la démonstration animée de l'aperçu (ms).
-DEMO_STEP_MS = 700
-#: Temps d'affichage complet de la bulle entre deux transitions (ms).
-PREVIEW_HOLD_MS = 900
+#: Assez lente pour suivre des yeux la touche enfoncée, la relâcher, puis le
+#: clic : une démonstration trop rapide ne laisse voir qu'un clignotement.
+DEMO_STEP_MS = 1200
+#: Pause sur la bulle visible avant de la faire sortir (ms).
+#: La transition elle-même garde la durée choisie ; seule cette pause la
+#: précède, pour laisser le temps de voir la bulle au repos.
+PREVIEW_HOLD_MS = 1500
 #: Pause sur la bulle masquée avant qu'elle revienne (ms).
 PREVIEW_GAP_MS = 260
+#: Réglages qui ne concernent que l'entrée et la sortie de la bulle.
+TRANSITION_FIELDS = ("transition", "transition_out_ms", "transition_in_ms")
 
 
 def _paint_checkerboard(painter: QPainter, width: int, height: int) -> None:
@@ -251,6 +257,10 @@ class PreviewPanel(QWidget):
 
     La bulle disparaît et revient ensuite avec la transition choisie, sur
     sa durée réelle, pour juger du réglage sans ouvrir l'overlay.
+
+    La démonstration ne tourne pas en boucle : elle se joue une fois, à
+    l'ouverture de la fenêtre puis à chaque changement de réglage, et
+    l'aperçu reste ensuite sur la dernière image.
     """
 
     def __init__(
@@ -324,8 +334,11 @@ class PreviewPanel(QWidget):
         self._mouse = self._visual.mouse
         self._layout.addWidget(self._visual, 0, Qt.AlignmentFlag.AlignLeft)
 
+        # La démonstration se joue une fois par réglage : le minuteur est
+        # relancé à chaque étape, puis laissé s'arrêter, au lieu de boucler.
         self._demo_step = 0
         self._demo_timer = QTimer(self)
+        self._demo_timer.setSingleShot(True)
         self._demo_timer.setInterval(DEMO_STEP_MS)
         self._demo_timer.timeout.connect(self._advance_demo)
 
@@ -342,14 +355,43 @@ class PreviewPanel(QWidget):
         self._cycle_timer.timeout.connect(self._on_cycle_timeout)
 
         self._apply_mode(config)
-        self._apply_demo_step()
-        self._demo_timer.start()
         self._sync_minimum_size()
-        self.restart_transition()
+        self.play_demo()
 
     # ------------------------------------------------------------------
     # Démonstration animée
     # ------------------------------------------------------------------
+    def play_demo(self) -> None:
+        """Rejoue une fois la démonstration, puis la transition.
+
+        L'aperçu ne s'anime plus en boucle : il redevient immobile une fois
+        la démonstration finie, jusqu'au prochain réglage.
+        """
+        self._reset_animation()
+        self._demo_step = 0
+        self._apply_demo_step()
+        self._demo_timer.start()
+
+    def play_transition(self) -> None:
+        """Rejoue la transition une fois, sans la démonstration des gestes.
+
+        Un réglage de transition se juge en le voyant : inutile de le faire
+        attendre la fin d'une frappe simulée.
+        """
+        self._reset_animation()
+        self._cycle_timer.start(PREVIEW_HOLD_MS)
+
+    def _reset_animation(self) -> None:
+        """Ramène l'aperçu à la bulle visible, prête à être rejouée."""
+        self._demo_timer.stop()
+        self._transition.stop()
+        self._cycle_timer.stop()
+        self._phase = "idle"
+        self._progress = 0.0
+        self._shot = None
+        self._stack.setCurrentWidget(self._surface)
+        self.update()
+
     def _demo_steps(
         self,
     ) -> tuple[
@@ -374,10 +416,18 @@ class PreviewPanel(QWidget):
         )
 
     def _advance_demo(self) -> None:
-        """Passe à l'étape suivante de la démonstration."""
+        """Passe à l'étape suivante, puis rejoue la transition à la fin."""
         steps = self._demo_steps()
-        self._demo_step = (self._demo_step + 1) % len(steps)
+        next_step = self._demo_step + 1
+        if next_step >= len(steps):
+            # Fin de la démonstration : la bulle sort et revient une dernière
+            # fois, puis l'aperçu reste au repos.
+            self._demo_timer.stop()
+            self._start_exit()
+            return
+        self._demo_step = next_step
         self._apply_demo_step()
+        self._demo_timer.start()
 
     def _apply_demo_step(self) -> None:
         """Applique l'étape courante au clavier, à la souris et à la pastille."""
@@ -422,6 +472,7 @@ class PreviewPanel(QWidget):
         return key_shape_for(self._config, label)
 
     def update_appearance(self, config: Config, font_family: str) -> None:
+        previous = self._config
         self._config = config
         self._palette.update_from_config(config)
         self._surface.set_config(config)
@@ -439,12 +490,23 @@ class PreviewPanel(QWidget):
         self._visual.set_font(keyboard_font)
         self._apply_mode(config)
         self._sync_minimum_size()
-        # Un nouveau réglage relance la démonstration de la transition.
-        self.restart_transition()
+        # Un réglage de transition se juge en le voyant : il rejoue la
+        # transition tout de suite, les autres la démonstration des gestes.
+        if self._transition_changed(previous, config):
+            self.play_transition()
+        else:
+            self.play_demo()
         # Le QScrollArea réévalue la taille du widget après le layout : on
         # réapplique la taille minimale une fois celui-ci stabilisé.
         self._min_timer.start(0)
         self.update()
+
+    def _transition_changed(self, previous: Config, config: Config) -> bool:
+        """Vrai si le changement touche la transition elle-même."""
+        return any(
+            getattr(previous, name, None) != getattr(config, name, None)
+            for name in TRANSITION_FIELDS
+        )
 
     # ------------------------------------------------------------------
     # Aperçu de la transition
@@ -473,22 +535,9 @@ class PreviewPanel(QWidget):
         super().hideEvent(event)
 
     def showEvent(self, event) -> None:  # noqa: N802 - API Qt
-        """Relance la démonstration à l'ouverture de la fenêtre."""
+        """Rejoue la démonstration à l'ouverture de la fenêtre."""
         super().showEvent(event)
-        if not self._demo_timer.isActive():
-            self._demo_timer.start()
-        self.restart_transition()
-
-    def restart_transition(self) -> None:
-        """Rejoue l'aperçu de la transition depuis le début."""
-        self._transition.stop()
-        self._cycle_timer.stop()
-        self._phase = "idle"
-        self._progress = 0.0
-        self._shot = None
-        self._stack.setCurrentWidget(self._surface)
-        self._cycle_timer.start(PREVIEW_HOLD_MS)
-        self.update()
+        self.play_demo()
 
     def _on_cycle_timeout(self) -> None:
         if self._phase == "idle":
@@ -513,6 +562,8 @@ class PreviewPanel(QWidget):
 
     def _start_exit(self) -> None:
         """Gèle l'image de la bulle et la fait sortir."""
+        # La pause qui précède appartient à la phase précédente.
+        self._cycle_timer.stop()
         style = self._transition_style()
         duration = self._exit_duration()
         if style == "none" or duration <= 0:
@@ -532,6 +583,7 @@ class PreviewPanel(QWidget):
 
     def _start_entry(self) -> None:
         """Ramenne la bulle avec la même transition, en sens inverse."""
+        self._cycle_timer.stop()
         duration = self._entry_duration()
         if duration <= 0:
             self._finish_entry()
@@ -567,12 +619,12 @@ class PreviewPanel(QWidget):
             self._finish_entry()
 
     def _finish_entry(self) -> None:
-        """Rend la vraie bulle à l'aperçu, prête pour le tour suivant."""
+        """Rend la vraie bulle à l'aperçu, au repos jusqu'au prochain réglage."""
+        self._cycle_timer.stop()
         self._phase = "idle"
         self._progress = 0.0
         self._shot = None
         self._stack.setCurrentWidget(self._surface)
-        self._cycle_timer.start(PREVIEW_HOLD_MS)
         self.update()
 
     def _update_stage(self) -> None:

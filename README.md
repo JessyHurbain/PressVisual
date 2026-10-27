@@ -455,13 +455,17 @@ l'intérieur plutôt que d'allonger la fenêtre.
   touche par touche (voir l'éditeur de touches ci-dessus).
 - **Interface** : langue de l'interface (automatique, français ou anglais).
   Le changement s'applique dès l'enregistrement, sans redémarrer.
-- **Aperçu animé** : la démonstration rejoue en boucle une frappe et un clic
-  (touche `A`, puis `Maj + E` avec un clic droit et un cran de molette), dans
-  le mode choisi, pour juger du rendu sans rien taper soi-même. La bulle
-  disparaît et revient ensuite avec la transition sélectionnée, sur sa durée
-  réelle (la disparition sur `transition_out_ms`, le retour sur
-  `transition_in_ms`) : glissements, zoom et fondu se voient donc avant
-  d'enregistrer, et chaque changement de réglage relance la démonstration.
+- **Aperçu animé** : la démonstration joue une frappe et un clic (touche
+  `A`, puis `Maj + E` avec un clic droit et un cran de molette), dans le mode
+  choisi, pour juger du rendu sans rien taper soi-même. La bulle disparaît et
+  revient ensuite avec la transition sélectionnée, sur sa durée réelle (la
+  disparition sur `transition_out_ms`, le retour sur `transition_in_ms`) :
+  glissements, zoom et fondu se voient donc avant d'enregistrer. Elle ne
+  tourne pas en boucle : elle se joue une fois, à l'ouverture de la fenêtre et
+  à chaque changement de réglage, puis l'aperçu reste immobile, tandis que les
+  couleurs, la police et les formes continuent de suivre les réglages en
+  direct. Changer `transition`, `transition_out_ms` ou `transition_in_ms`
+  rejoue la transition seule, sans attendre la fin de la frappe simulée.
 - **Réinitialiser** restaure les valeurs d'origine, **Annuler** ferme sans rien
   changer et **Enregistrer** applique les réglages immédiatement puis les écrit
   dans le fichier de configuration.

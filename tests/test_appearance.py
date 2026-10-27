@@ -299,18 +299,62 @@ def test_preview_animates_a_keystroke_and_a_click(qapp, config):
         dialog.deleteLater()
 
 
-def test_preview_animation_loops_back(qapp, config):
+def test_preview_demo_plays_once_then_shows_the_transition(qapp, config):
+    config.transition = "fade"
     dialog = make_dialog(qapp, config)
     try:
         preview = dialog.preview
+        preview._demo_timer.stop()
         preview._demo_step = 0
         preview._apply_demo_step()
 
-        for _ in range(len(preview._demo_steps())):
+        # Une étape par minuteur, sans revenir au début : la démonstration
+        # s'arrête au lieu de boucler.
+        for _ in range(len(preview._demo_steps()) - 1):
             preview._advance_demo()
 
-        assert preview._demo_step == 0
-        assert preview._keyboard.active_labels() == ["A"]
+        assert preview._demo_step == len(preview._demo_steps()) - 1
+        assert preview._demo_timer.isActive()
+
+        preview._advance_demo()
+
+        assert not preview._demo_timer.isActive()
+        # Elle se termine par la sortie de la bulle, une seule fois.
+        assert preview._phase == "exit"
+    finally:
+        dialog.deleteLater()
+
+
+def test_preview_stays_still_until_a_setting_changes(qapp, config):
+    dialog = make_dialog(qapp, config)
+    try:
+        preview = dialog.preview
+        preview._demo_timer.stop()
+        preview._cycle_timer.stop()
+        assert not preview._demo_timer.isActive()
+
+        dialog.font_size.setValue(config.font_size + 2)
+
+        assert preview._demo_timer.isActive()
+    finally:
+        dialog.deleteLater()
+
+
+def test_preview_replays_the_transition_alone_for_a_transition_setting(
+    qapp, config
+):
+    dialog = make_dialog(qapp, config)
+    try:
+        preview = dialog.preview
+
+        dialog.transition_combo.setCurrentIndex(
+            dialog.transition_combo.findData("zoom")
+        )
+
+        # Pas de frappe simulée : la transition se voit tout de suite.
+        assert not preview._demo_timer.isActive()
+        assert preview._cycle_timer.isActive()
+        assert preview._phase == "idle"
     finally:
         dialog.deleteLater()
 
@@ -704,7 +748,7 @@ def test_preview_cycle_hides_then_brings_the_bubble_back(qapp, config):
     dialog = make_dialog(qapp, config)
     try:
         preview = dialog.preview
-        preview.restart_transition()
+        preview.play_transition()
         assert preview._phase == "idle"
 
         preview._on_cycle_timeout()
@@ -721,5 +765,8 @@ def test_preview_cycle_hides_then_brings_the_bubble_back(qapp, config):
         qapp.processEvents()
         assert preview._phase == "idle"
         assert preview._stack.currentWidget() is preview._surface
+        # La bulle revenue, plus rien ne se rejoue tout seul.
+        assert not preview._cycle_timer.isActive()
+        assert not preview._demo_timer.isActive()
     finally:
         dialog.deleteLater()
