@@ -228,6 +228,18 @@ Une tâche séparée, **Analyse statique et couverture**, s'exécute une seule f
   [pyproject.toml](pyproject.toml), et `--cov-report=term-missing` indique les
   lignes non couvertes.
 
+### Langue des tests
+
+La suite ne dépend pas de la langue de votre système : elle la fige à l'anglais
+pendant toute la session, comme sur les runners. Les tests qui attendent des
+libellés français partent de la langue source — aucune traduction installée —
+si bien que le résultat est le même partout.
+
+Un test qui appelle `main()` doit donc passer `--lang fr` : sans cela,
+l'application installe le traducteur anglais **pour toute la session**, et le
+garde-fou `_pas_de_traducteur_oublie` de [tests/conftest.py](tests/conftest.py)
+fait échouer le test fautif en le nommant, sur votre machine comme dans la CI.
+
 ### Régénérer les illustrations
 
 Les captures et le GIF de ce README sont produits hors écran par l'application

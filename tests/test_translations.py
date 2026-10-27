@@ -342,6 +342,16 @@ def test_auto_language_follows_system(monkeypatch, system_locale, expected):
     assert pressvisual.resolve_language("") == expected
 
 
+def test_suite_language_does_not_follow_the_host():
+    """La langue « auto » des tests est figée, quel que soit le poste.
+
+    `tests/conftest.py` fixe la langue du système à l'anglais pour toute la
+    session : c'est ce qui empêche un test d'oublier `--lang fr` de passer
+    inaperçu en local. Retirer ce réglage fait échouer ce test-ci.
+    """
+    assert pressvisual.resolve_language("auto") == "en"
+
+
 def test_unknown_language_falls_back_to_system(monkeypatch):
     fake = types.SimpleNamespace(name=lambda: "fr_FR")
     monkeypatch.setattr(pv_i18n.QLocale, "system", lambda: fake)

@@ -23,7 +23,11 @@ import pytest  # noqa: E402 - après le réglage de QT_QPA_PLATFORM
 from PyQt6.QtWidgets import QApplication  # noqa: E402
 
 import pressvisual  # noqa: E402 - dépend du réglage ci-dessus
-from pressvisual_app import diagnostics, rows  # noqa: E402 - idem
+from pressvisual_app import diagnostics, i18n, rows  # noqa: E402 - idem
+
+#: Chaîne témoin dont la traduction anglaise diffère du français : sa valeur
+#: dit quelle langue est active dans l'application.
+LANGUAGE_SENTINEL = "Espace"
 
 
 @pytest.fixture(autouse=True)
@@ -47,6 +51,55 @@ def qapp():
     yield app
     if created:
         app.quit()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _langue_du_systeme_figee():
+    """Fige la langue du système, comme sur les runners d'intégration continue.
+
+    Laissée au poste, la langue « auto » vaut le français ici et l'anglais
+    ailleurs : la suite ne serait verte que sur l'une des deux machines, et un
+    test qui oublie ``--lang fr`` ne se verrait qu'en CI — c'est précisément
+    l'écueil qui a rendu la CI rouge sans que rien ne bouge en local. Figée à
+    l'anglais, elle rend le comportement identique partout, et l'oubli installe
+    alors un traducteur anglais sur *toutes* les machines, ce que le garde-fou
+    suivant intercepte.
+    """
+    original = i18n.QLocale.system
+    try:
+        i18n.QLocale.system = staticmethod(lambda: i18n.QLocale("en_US"))
+        yield
+    finally:
+        i18n.QLocale.system = original
+
+
+@pytest.fixture(scope="session")
+def _langue_de_depart(qapp):
+    """Langue de l'application avant le premier test.
+
+    Aucun traducteur n'est installé : les chaînes françaises, langue source,
+    s'affichent telles quelles, quelle que soit la machine.
+    """
+    return pressvisual._t(LANGUAGE_SENTINEL)
+
+
+@pytest.fixture(autouse=True)
+def _pas_de_traducteur_oublie(_langue_de_depart):
+    """Un traducteur installé par un test ne doit pas survivre à ce test.
+
+    ``main()`` installe la langue du système : appelé sans ``--lang fr``, un
+    test laissait l'anglais en place pour toute la session, et les tests
+    suivants — ceux qui attendent « Clic droit » ou « Quitter » — échouaient
+    loin de leur cause. La langue du système étant figée à l'anglais, cet oubli
+    produit maintenant le même échec ici et sur la CI, au plus près du test
+    fautif.
+    """
+    yield
+    assert pressvisual._t(LANGUAGE_SENTINEL) == _langue_de_depart, (
+        f"{LANGUAGE_SENTINEL!r} est traduit après ce test : un traducteur "
+        "reste installé pour toute la session. Passe --lang fr à main(), ou "
+        "retire le traducteur à la fin du test."
+    )
 
 
 @pytest.fixture
