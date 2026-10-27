@@ -142,6 +142,11 @@ DEMO_STEP_MS = 1200
 PREVIEW_HOLD_MS = 1500
 #: Pause sur la bulle masquée avant qu'elle revienne (ms).
 PREVIEW_GAP_MS = 260
+#: Attente avant de rejouer la démonstration après un réglage (ms).
+#: Un curseur glissé d'un trait envoie une valeur par cran : sans cette
+#: attente, la démonstration repartirait des dizaines de fois et resterait
+#: figée sur sa première étape pendant tout le geste.
+PREVIEW_DEBOUNCE_MS = 220
 #: Réglages qui ne concernent que l'entrée et la sortie de la bulle.
 TRANSITION_FIELDS = ("transition", "transition_out_ms", "transition_in_ms")
 
@@ -259,8 +264,9 @@ class PreviewPanel(QWidget):
     sa durée réelle, pour juger du réglage sans ouvrir l'overlay.
 
     La démonstration ne tourne pas en boucle : elle se joue une fois, à
-    l'ouverture de la fenêtre puis à chaque changement de réglage, et
-    l'aperçu reste ensuite sur la dernière image.
+    l'ouverture de la fenêtre puis à chaque changement de réglage — une seule
+    fois par geste, quand les valeurs se stabilisent — et l'aperçu reste
+    ensuite sur la dernière image.
     """
 
     def __init__(
@@ -354,6 +360,14 @@ class PreviewPanel(QWidget):
         self._cycle_timer.setSingleShot(True)
         self._cycle_timer.timeout.connect(self._on_cycle_timeout)
 
+        # Rejeu différé : un même geste (curseur, molette de réglage) arme
+        # une seule démonstration, jouée quand les valeurs se stabilisent.
+        self._replay_transition = False
+        self._replay_timer = QTimer(self)
+        self._replay_timer.setSingleShot(True)
+        self._replay_timer.setInterval(PREVIEW_DEBOUNCE_MS)
+        self._replay_timer.timeout.connect(self._replay)
+
         self._apply_mode(config)
         self._sync_minimum_size()
         self.play_demo()
@@ -381,8 +395,21 @@ class PreviewPanel(QWidget):
         self._reset_animation()
         self._cycle_timer.start(PREVIEW_HOLD_MS)
 
+    def _schedule_replay(self, transition_only: bool) -> None:
+        """Programme un rejeu, une fois le réglage stabilisé."""
+        self._replay_transition = transition_only
+        self._replay_timer.start()
+
+    def _replay(self) -> None:
+        """Rejoue ce que demandait le dernier réglage modifié."""
+        if self._replay_transition:
+            self.play_transition()
+        else:
+            self.play_demo()
+
     def _reset_animation(self) -> None:
         """Ramène l'aperçu à la bulle visible, prête à être rejouée."""
+        self._replay_timer.stop()
         self._demo_timer.stop()
         self._transition.stop()
         self._cycle_timer.stop()
@@ -491,11 +518,9 @@ class PreviewPanel(QWidget):
         self._apply_mode(config)
         self._sync_minimum_size()
         # Un réglage de transition se juge en le voyant : il rejoue la
-        # transition tout de suite, les autres la démonstration des gestes.
-        if self._transition_changed(previous, config):
-            self.play_transition()
-        else:
-            self.play_demo()
+        # transition seule, les autres la démonstration des gestes. Dans les
+        # deux cas le rejeu attend la fin du geste.
+        self._schedule_replay(self._transition_changed(previous, config))
         # Le QScrollArea réévalue la taille du widget après le layout : on
         # réapplique la taille minimale une fois celui-ci stabilisé.
         self._min_timer.start(0)
@@ -529,6 +554,7 @@ class PreviewPanel(QWidget):
 
     def hideEvent(self, event) -> None:  # noqa: N802 - API Qt
         """Suspend les animations quand l'aperçu n'est plus visible."""
+        self._replay_timer.stop()
         self._demo_timer.stop()
         self._transition.stop()
         self._cycle_timer.stop()

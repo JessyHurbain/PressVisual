@@ -464,7 +464,8 @@ l'intérieur plutôt que d'allonger la fenêtre.
   tourne pas en boucle : elle se joue une fois, à l'ouverture de la fenêtre et
   à chaque changement de réglage, puis l'aperçu reste immobile, tandis que les
   couleurs, la police et les formes continuent de suivre les réglages en
-  direct. Changer `transition`, `transition_out_ms` ou `transition_in_ms`
+  direct. Un curseur glissé d'un trait n'arme qu'une seule démonstration,
+  jouée quand les valeurs se stabilisent. Changer `transition`, `transition_out_ms` ou `transition_in_ms`
   rejoue la transition seule, sans attendre la fin de la frappe simulée.
 - **Réinitialiser** restaure les valeurs d'origine, **Annuler** ferme sans rien
   changer et **Enregistrer** applique les réglages immédiatement puis les écrit

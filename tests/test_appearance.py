@@ -331,9 +331,16 @@ def test_preview_stays_still_until_a_setting_changes(qapp, config):
         preview = dialog.preview
         preview._demo_timer.stop()
         preview._cycle_timer.stop()
+        preview._replay_timer.stop()
         assert not preview._demo_timer.isActive()
 
         dialog.font_size.setValue(config.font_size + 2)
+
+        # Le rejeu attend la fin du geste, puis la démonstration repart.
+        assert preview._replay_timer.isActive()
+        assert not preview._demo_timer.isActive()
+
+        preview._replay()
 
         assert preview._demo_timer.isActive()
     finally:
@@ -350,11 +357,36 @@ def test_preview_replays_the_transition_alone_for_a_transition_setting(
         dialog.transition_combo.setCurrentIndex(
             dialog.transition_combo.findData("zoom")
         )
+        preview._replay()
 
         # Pas de frappe simulée : la transition se voit tout de suite.
         assert not preview._demo_timer.isActive()
         assert preview._cycle_timer.isActive()
         assert preview._phase == "idle"
+    finally:
+        dialog.deleteLater()
+
+
+def test_a_slider_drag_replays_the_preview_once(qapp, config):
+    dialog = make_dialog(qapp, config)
+    try:
+        preview = dialog.preview
+        replays: list[int] = []
+        original = preview.play_demo
+        preview.play_demo = lambda: replays.append(1) or original()
+        preview._replay_timer.stop()
+
+        # Un cran de curseur envoyé toutes les quelques millisecondes :
+        # l'aperçu ne doit pas repartir à chaque valeur.
+        for value in range(40, 70, 3):
+            dialog.opacity_slider.setValue(value)
+
+        assert replays == []
+        assert preview._replay_timer.isActive()
+
+        preview._replay()
+
+        assert replays == [1]
     finally:
         dialog.deleteLater()
 
@@ -734,7 +766,9 @@ def test_changing_the_transition_restarts_the_preview(qapp, config):
         dialog.transition_combo.setCurrentIndex(
             dialog.transition_combo.findData("slide-left")
         )
+        preview._replay()
 
+        # Le rejeu interrompt la sortie en cours et repart de la bulle.
         assert preview._phase == "idle"
         assert preview._transition.state() != QAbstractAnimation.State.Running
         assert preview._stack.currentWidget() is preview._surface
