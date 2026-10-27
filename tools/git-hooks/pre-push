@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
-# Crochet Git « pre-push » : vérifie le dépôt avant d'envoyer des commits.
+# Crochet Git « pre-push » : vérifie la révision poussée, pas l'arbre de travail.
 #
-# Il est versionné ici, avec le reste des outils, et activé par :
+# Git annonce sur l'entrée standard les références qu'il s'apprête à envoyer ;
+# le crochet en extrait les commits, en fait une copie de travail jetable
+# (git worktree) et y rejoue tools/check_ci.sh. Vérifier l'arbre local ne dirait
+# rien d'une branche qui n'est pas extraite, ni d'un commit entouré de
+# modifications en cours : c'est la révision annoncée qui doit passer.
+#
+# La procédure appliquée est celle du dépôt courant (tools/check_ci.sh), sur les
+# sources de la révision vérifiée — une révision antérieure à ce script est donc
+# vérifiée elle aussi.
+#
+# Il est versionné avec les outils et activé par :
 #   git config --local core.hooksPath tools/git-hooks
-# Le crochet profite alors à chaque clone qui pose ce réglage, et il suit les
-# évolutions du dépôt au lieu de vivre en copie dans .git/hooks, invisible.
 #
 # Pour pousser sans attendre : git push --no-verify
 
@@ -16,14 +24,106 @@ if [[ -n ${CI:-}${GITHUB_ACTIONS:-} ]]; then
     exit 0
 fi
 
-# .git/hooks/pre-push → racine ; tools/git-hooks/pre-push → racine également.
-ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+CLONE_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 
-printf '[crochet] vérification avant poussée (détail : tools/check_ci.sh)\n'
-if bash "$ROOT_DIR/tools/check_ci.sh"; then
+note() { printf '[crochet] %s\n' "$1"; }
+
+# ---------------------------------------------------------------------------
+# Interpréteur
+# ---------------------------------------------------------------------------
+
+# La copie de travail ne contient pas d'environnement virtuel : c'est celui du
+# dépôt qui exécute les tests, sur les sources de la révision vérifiée.
+PYTHON_VAR=()
+if [[ -x $CLONE_DIR/.venv/bin/python ]]; then
+    PYTHON_VAR=("PYTHON=$CLONE_DIR/.venv/bin/python")
+elif [[ -x $CLONE_DIR/.venv/Scripts/python.exe ]]; then
+    PYTHON_VAR=("PYTHON=$CLONE_DIR/.venv/Scripts/python.exe")
+fi
+
+# ---------------------------------------------------------------------------
+# Révisions annoncées par Git
+# ---------------------------------------------------------------------------
+
+# Lancé à la main, le crochet n'a pas d'entrée à lire : on vérifie HEAD.
+if [[ -t 0 ]]; then
+    note "appel manuel : vérification de HEAD."
+    input=$(printf 'HEAD %s\n' "$(git -C "$CLONE_DIR" rev-parse HEAD)")
+else
+    input=$(cat)
+fi
+
+# Une ligne par référence : <réf locale> <sha locale> <réf distante> <sha distante>.
+REVISIONS=()
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+    if [[ -z ${local_sha:-} ]]; then
+        continue
+    fi
+    # Une suppression n'a aucun objet à vérifier.
+    if [[ $local_sha =~ ^0+$ ]]; then
+        continue
+    fi
+    # Une étiquette annotée désigne un objet d'étiquette : on remonte au commit.
+    commit=$(git -C "$CLONE_DIR" rev-parse -q --verify "$local_sha^{commit}") || continue
+    # Une même révision peut arriver par plusieurs références (branche et étiquette).
+    duplicate=0
+    if ((${#REVISIONS[@]})); then
+        for known in "${REVISIONS[@]}"; do
+            if [[ $known == "$commit" ]]; then
+                duplicate=1
+            fi
+        done
+    fi
+    if ((duplicate == 0)); then
+        REVISIONS+=("$commit")
+    fi
+done <<<"$input"
+
+if ((${#REVISIONS[@]} == 0)); then
+    note "rien à vérifier : aucune révision n'est envoyée."
     exit 0
 fi
 
-printf '\n[crochet] la vérification a échoué : poussée interrompue.\n' >&2
-printf '[crochet] corriger, puis réessayer — ou forcer : git push --no-verify\n' >&2
-exit 1
+# ---------------------------------------------------------------------------
+# Vérification, révision par révision
+# ---------------------------------------------------------------------------
+
+WORKTREE=""
+
+cleanup() {
+    if [[ -n $WORKTREE ]]; then
+        git -C "$CLONE_DIR" worktree remove --force "$WORKTREE" 2>/dev/null || true
+        rm -rf "$WORKTREE"
+        git -C "$CLONE_DIR" worktree prune 2>/dev/null || true
+        WORKTREE=""
+    fi
+}
+trap cleanup EXIT
+
+for revision in "${REVISIONS[@]}"; do
+    note "révision ${revision:0:8} — $(git -C "$CLONE_DIR" log -1 --format=%s "$revision")"
+
+    WORKTREE=$(mktemp -d "${TMPDIR:-/tmp}/pressvisual-check-XXXXXX")
+    if ! git -C "$CLONE_DIR" worktree add --detach --quiet "$WORKTREE" "$revision"; then
+        note "impossible d'extraire cette révision : poussée interrompue."
+        exit 1
+    fi
+
+    status=0
+    if ((${#PYTHON_VAR[@]})); then
+        ROOT_DIR="$WORKTREE" env "${PYTHON_VAR[@]}" \
+            bash "$CLONE_DIR/tools/check_ci.sh" || status=$?
+    else
+        ROOT_DIR="$WORKTREE" bash "$CLONE_DIR/tools/check_ci.sh" || status=$?
+    fi
+
+    cleanup
+
+    if ((status != 0)); then
+        note "la vérification a échoué : poussée interrompue."
+        note "corriger, puis réessayer — ou forcer : git push --no-verify"
+        exit 1
+    fi
+done
+
+exit 0

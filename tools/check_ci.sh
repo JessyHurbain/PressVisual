@@ -17,6 +17,9 @@
 # Variables d'environnement facultatives :
 #   PYTHON=/chemin/vers/python   interpréteur à utiliser (défaut : .venv, sinon python3)
 #   SKIP_COVERAGE=1              tests sans mesure de couverture (plus rapide)
+#   ROOT_DIR=/chemin/vers/dossier  dossier à vérifier (défaut : la racine du dépôt) ;
+#                                  le crochet pre-push s'en sert pour vérifier une
+#                                  copie de travail d'une autre révision
 #
 # Utilisation :
 #   bash tools/check_ci.sh
@@ -26,7 +29,7 @@
 
 set -euo pipefail
 
-ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+ROOT_DIR=${ROOT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
 cd "$ROOT_DIR"
 
 step() { printf '\n[vérification] %s\n' "$1"; }

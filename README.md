@@ -215,8 +215,12 @@ les autres versions de Python de la matrice ne sont pas reproduits ; le script
 annonce ce qu'il a utilisé. `SKIP_COVERAGE=1` saute la mesure de couverture et
 `PYTHON=/chemin/vers/python` impose un interpréteur.
 
-Pour ne plus y penser, le dépôt fournit un crochet `pre-push` versionné qui
-lance cette vérification et interrompt la poussée si elle échoue :
+Pour ne plus y penser, le dépôt fournit un crochet `pre-push` versionné : il
+extrait la révision réellement poussée dans une copie de travail jetable et y
+rejoue cette vérification, avant d'interrompre la poussée si elle échoue. Une
+branche qui n'est pas extraite, ou des modifications en cours dans votre arbre
+de travail, ne faussent donc pas le résultat : c'est bien la révision annoncée
+par Git qui passe les tests.
 
 ```bash
 git config --local core.hooksPath tools/git-hooks
