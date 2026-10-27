@@ -281,15 +281,22 @@ class InputListener(threading.Thread):
 
             now = time.monotonic()
             count = 1
-            if name == "left" and self._last_click is not None:
-                last_time, last_x, last_y, last_count = self._last_click
-                if (
-                    now - last_time <= DOUBLE_CLICK_WINDOW
-                    and abs(x - last_x) <= 6
-                    and abs(y - last_y) <= 6
-                ):
-                    count = min(last_count + 1, 3)
-            self._last_click = (now, int(x), int(y), count)
+            if name == "left":
+                if self._last_click is not None:
+                    last_time, last_x, last_y, last_count = self._last_click
+                    if (
+                        now - last_time <= DOUBLE_CLICK_WINDOW
+                        and abs(x - last_x) <= 6
+                        and abs(y - last_y) <= 6
+                    ):
+                        count = min(last_count + 1, 3)
+                self._last_click = (now, int(x), int(y), count)
+            else:
+                # Seul le bouton gauche enchaîne les clics : un autre bouton
+                # interrompt la séquence au lieu de la prolonger, sinon un
+                # clic droit suivi d'un clic gauche au même endroit passait
+                # pour un double clic.
+                self._last_click = None
 
             self._bridge.mouse_event.emit(
                 MouseEvent(

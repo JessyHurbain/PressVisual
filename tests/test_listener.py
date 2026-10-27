@@ -367,6 +367,18 @@ def test_right_click_is_never_aggregated(recorder, config):
     assert [event.count for event in recorder.mouse] == [1, 1]
 
 
+def test_right_click_breaks_the_left_double_click(recorder, config):
+    """Un autre bouton entre deux clics gauches interrompt la séquence."""
+    listener = make_listener(recorder, config)
+
+    listener._on_click(10, 10, mouse.Button.left, True)
+    listener._on_click(10, 10, mouse.Button.right, True)
+    listener._on_click(10, 10, mouse.Button.left, True)
+
+    assert [event.button for event in recorder.mouse] == ["left", "right", "left"]
+    assert [event.count for event in recorder.mouse] == [1, 1, 1]
+
+
 def test_distant_clicks_are_not_a_double_click(recorder, config):
     listener = make_listener(recorder, config)
 
