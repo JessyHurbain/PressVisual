@@ -202,6 +202,19 @@ python -m ruff check .          # analyse statique
 python -m pytest --cov          # couverture des modules de pressvisual_app
 ```
 
+Avant de pousser, les étapes de la CI en une seule commande :
+
+```bash
+bash tools/check_ci.sh
+```
+
+Le script rejoue la compilation, `ruff` et les tests avec le seuil de couverture
+sous une locale neutre et, sous Linux, avec `xvfb-run` : ce sont les conditions
+des runners, celles où un échec invisible sur votre poste se révèle. Windows et
+les autres versions de Python de la matrice ne sont pas reproduits ; le script
+annonce ce qu'il a utilisé. `SKIP_COVERAGE=1` saute la mesure de couverture et
+`PYTHON=/chemin/vers/python` impose un interpréteur.
+
 Les tests couvrent la configuration (chargement, validation, enregistrement),
 l'analyse des raccourcis et des touches, le fil de capture (modificateurs avec
 la souris, molette, double-clic), le rendu de l'overlay (combinaisons, texte
@@ -1159,7 +1172,8 @@ pressvisual_app/      Code de l'application
   cli.py              Ligne de commande et démarrage
   diagnostics.py      Messages d'erreur et journal (exécutables sans console)
 translations/         Catalogues de traduction (.ts source, .qm compilé)
-tools/                Compilation des .ts en .qm, builds, captures du README
+tools/                Compilation des .ts en .qm, builds, captures du README,
+                      vérification dans les conditions de la CI
 tests/                Suite de tests hors écran (pytest)
 docs/images/          Captures d'écran utilisées par ce README, générées par
                       tools/make_docs_images.py
