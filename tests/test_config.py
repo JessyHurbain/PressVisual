@@ -82,6 +82,53 @@ def test_saving_cleans_a_file_holding_both_key_names(tmp_path):
     assert json.loads(path.read_text(encoding="utf-8")) == {"transition_out_ms": 800}
 
 
+def test_unrelated_save_keeps_the_migrated_durations(tmp_path):
+    """Déplacer la bulle ne doit pas effacer les anciennes durées."""
+    path = tmp_path / "config.json"
+    write_json(path, {"fade_in_ms": 250, "fade_out_ms": 800})
+    config = pressvisual.Config.load(path, lambda _message: None)
+
+    assert config.remember_free_position(10, 20, 300, 80)
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["transition_in_ms"] == 250
+    assert data["transition_out_ms"] == 800
+    assert data["free_position"] == [10, 20, 300, 80]
+    assert "fade_in_ms" not in data
+    assert "fade_out_ms" not in data
+
+    reloaded = pressvisual.Config.load(path, lambda _message: None)
+    reloaded.validate()
+    assert reloaded.transition_in_ms == 250
+    assert reloaded.transition_out_ms == 800
+
+
+def test_saving_a_duration_overrides_the_migrated_value(tmp_path):
+    path = tmp_path / "config.json"
+    write_json(path, {"fade_in_ms": 250, "fade_out_ms": 800})
+    config = pressvisual.Config.load(path, lambda _message: None)
+
+    assert config.save_appearance({"transition_out_ms": 640})
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["transition_out_ms"] == 640
+    assert data["transition_in_ms"] == 250
+    assert "fade_out_ms" not in data
+
+
+def test_migration_does_not_revive_a_current_key(tmp_path):
+    """Le nom actuel déjà enregistré reste prioritaire sur l'ancien."""
+    path = tmp_path / "config.json"
+    write_json(path, {"fade_out_ms": 800, "transition_out_ms": 300})
+    config = pressvisual.Config.load(path, lambda _message: None)
+
+    assert config.remember_keyboard_scale(1.25)
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["transition_out_ms"] == 300
+    assert "fade_out_ms" not in data
+
+
 def test_load_applies_keys_and_signals_unknown_ones(tmp_path):
     path = tmp_path / "config.json"
     write_json(path, {"opacity": 0.5, "font_family": "Inter", "inconnue": 1})

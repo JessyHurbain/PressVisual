@@ -53,8 +53,8 @@ APPEARANCE_CONFIG_KEYS: tuple[str, ...] = (
 )
 
 #: Anciens noms de clés, encore lus depuis un fichier existant. La valeur est
-#: reportée sous son nom actuel, et l'ancienne clé disparaît au prochain
-#: enregistrement : aucun utilisateur n'a à réécrire sa configuration.
+#: reportée sous son nom actuel dès le prochain enregistrement, qui retire
+#: l'ancienne clé : aucun utilisateur n'a à réécrire sa configuration.
 RENAMED_CONFIG_KEYS: dict[str, str] = {
     "fade_in_ms": "transition_in_ms",
     "fade_out_ms": "transition_out_ms",
@@ -397,6 +397,8 @@ class Config:
 
         path = self.path
         data: dict[str, object] = {}
+        #: Contenu actuel du fichier (vide s'il n'existe pas encore).
+        raw: dict[str, object] = {}
         deprecated: list[str] = []
         if path.exists():
             try:
@@ -434,6 +436,13 @@ class Config:
         }
         if not changed and not deprecated:
             return True
+        # Supprimer une ancienne clé sans reporter sa valeur sous le nom
+        # actuel perdait le réglage à la première écriture non liée (un
+        # déplacement, une taille de clavier) : la durée choisie revenait au
+        # défaut au redémarrage suivant.
+        for old, new in RENAMED_CONFIG_KEYS.items():
+            if old in raw and new not in data:
+                data[new] = raw[old]
         data.update(changed)
 
         temp_path = path.with_name(path.name + ".tmp")
