@@ -8,23 +8,26 @@ Elle est conçue pour les **captures d'écran**, les **tutoriels** et les
 **formations en ligne** : l'overlay est discret, élégant, toujours au premier
 plan, et n'apparaît que lorsqu'il y a quelque chose à montrer.
 
-![Overlay PressVisual sur un bureau : combinaison Ctrl + Maj + P, touche E et clic droit](docs/images/overlay-standard.png)
+![Overlay PressVisual sur un bureau : combinaison Ctrl + Maj + P, touche E comptée ×3 et clic droit](docs/images/overlay-standard.png)
 
-![Démonstration : saisie au clavier, Ctrl + C, clic gauche, molette, puis disparition en glissement](docs/images/demo.gif)
+![Démonstration : clavier complet avec Ctrl + C puis clic et molette, puis overlay standard avec frappe animée, appuis comptés et clic](docs/images/demo.gif)
 
-> *Démonstration en mode clavier : les touches s'allument, `Ctrl + C` s'affiche,
-> le bouton gauche s'enfonce, la molette tourne, puis la bulle sort en
-> glissant. Les captures de cette page sont générées avec l'application
-> elle-même ; le fond de bureau et la fenêtre sont une illustration.*
+> *Démonstration : en mode clavier complet, `Ctrl` et `C` s'allument, le bouton
+> gauche s'enfonce et un cran de molette s'affiche ; en overlay standard, les
+> lettres entrent une à une, trois appuis sur `J` se comptent (`J ×3`), puis
+> `Ctrl + C` et un clic gauche s'affichent. Les captures de cette page sont
+> générées avec l'application elle-même ; le fond de bureau et la fenêtre sont
+> une illustration.*
 
 ## Sommaire
 
 - [Fonctionnalités](#fonctionnalités)
 - [Installation](#installation) — [Tutoriel : première démonstration](#tutoriel--première-démonstration)
 - [Lancement](#lancement) — [Options de la ligne de commande](#options-de-la-ligne-de-commande)
-- [Utilisation](#utilisation) — [Transitions](#transitions-de-la-bulle),
-  [mode clavier](#mode-clavier-complet), [apparence](#personnaliser-lapparence),
-  [raccourcis](#raccourcis-globaux), [mode privé](#masquage-et-mode-privé)
+- [Utilisation](#utilisation) — [animations](#animations-des-lignes),
+  [transitions](#transitions-de-la-bulle), [mode clavier](#mode-clavier-complet),
+  [apparence](#personnaliser-lapparence), [raccourcis](#raccourcis-globaux),
+  [mode privé](#masquage-et-mode-privé)
 - [Configuration](#configuration) — [Détail des clés](#détail-des-clés)
 - [Langues](#langues) — [Empaqueter un exécutable](#empaqueter-en-exécutable-autonome)
 - [Dépannage](#dépannage) — [Tests](#tests) — [Structure du projet](#structure-du-projet)
@@ -37,9 +40,15 @@ plan, et n'apparaît que lorsqu'il y a quelque chose à montrer.
   **clavier complet** AZERTY ou QWERTY accompagné d'une **souris** dont les
   touches et les boutons s'allument au fil de la saisie. Le mode se choisit
   dans la fenêtre de personnalisation.
-- **Apparence personnalisable** : une fenêtre de réglages avec aperçu en direct
-  permet de changer les couleurs, la police, l'opacité, les coins arrondis et
-  les marges, puis d'enregistrer le tout dans la configuration.
+- **Apparence personnalisable** : une fenêtre de réglages en cinq onglets, avec
+  aperçu en direct, permet de changer les couleurs, la police, l'opacité, les
+  coins arrondis, les marges et la forme des touches, puis d'enregistrer le tout
+  dans la configuration.
+- **Animations d'apparition** : chaque nouvelle ligne de la bulle peut entrer en
+  fondu, zoom, rebond, glissement, chute ou se dérouler, au choix ; l'affichage
+  n'est jamais retardé pour autant.
+- **Appuis répétés comptés** : trois appuis de suite sur la même touche
+  s'affichent `[J] ×3` au lieu d'empiler trois pastilles identiques.
 - **Fenêtre sans bordure**, toujours au premier plan, déplaçable au clic-glisser.
 - **Apparition et disparition animées** : fondu, glissements dans les quatre
   directions, zoom ou disparition immédiate, avec la durée de votre choix ; le
@@ -125,9 +134,11 @@ affiche les raccourcis globaux ; laissez-le ouvert pendant la démonstration.
 
 Appuyez sur quelques touches, puis cliquez : la bulle apparaît en bas à droite
 de l'écran, avec une pastille par touche et une par clic. Les modificateurs
-maintenus forment une combinaison (`Ctrl + Maj + P`), la molette s'agrège
-(`Scroll ↓ ×3`) et les boutons latéraux sont reconnus. Après la dernière entrée,
-la bulle reste affichée deux secondes puis s'efface avec la transition choisie.
+maintenus forment une combinaison (`Ctrl + Maj + P`), plusieurs appuis de suite
+sur la même touche se comptent (`J ×3`), la molette s'agrège (`Scroll ↓ ×3`) et les
+boutons latéraux sont reconnus. Chaque nouvelle ligne entre avec une petite
+animation (fondu par défaut). Après la dernière entrée, la bulle reste affichée
+deux secondes puis s'efface avec la transition choisie.
 
 > Rien ne s'affiche ? Vérifiez que l'application a bien le droit d'écouter le
 > clavier sur votre système (voir [Dépannage](#dépannage)).
@@ -147,11 +158,13 @@ droit de la bulle (60 % à 200 %), sans passer par les réglages.
 ### 4. Ajuster l'apparence et les transitions
 
 La même fenêtre règle les couleurs, la police, l'opacité, les coins arrondis,
-la marge et la **transition de la bulle** (fondu, glissements, zoom ou aucune)
-avec sa durée. L'aperçu en bas applique chaque changement immédiatement et
-rejoue la transition en boucle, pour juger du rendu avant d'enregistrer.
+la marge, l'**animation des lignes** (fondu, zoom, rebond, glisser, chute,
+dérouler) et la **transition de la bulle** (fondu, glissements, zoom ou aucune)
+avec sa durée. Les réglages sont répartis en cinq onglets, et l'aperçu en bas
+applique chaque changement immédiatement : il rejoue une fois la démonstration
+à chaque réglage modifié, pour juger du rendu avant d'enregistrer.
 
-![Fenêtre Personnaliser l'overlay : couleurs, mise en forme, affichage et aperçu animé](docs/images/settings.png)
+![Fenêtre Personnaliser l'overlay : onglet Affichage, cinq onglets de réglages et aperçu des pastilles](docs/images/settings.png)
 
 **Enregistrer** applique et conserve les réglages : les valeurs sont écrites
 dans `config.json`, à côté de `pressvisual.py` (ou à l'emplacement donné à
@@ -210,10 +223,25 @@ Une tâche séparée, **Analyse statique et couverture**, s'exécute une seule f
   visée (Python 3.9) sont fixés dans [pyproject.toml](pyproject.toml), pour que
   le résultat soit identique sur votre machine et dans la CI.
 - **`pytest --cov`** mesure la couverture des modules de `pressvisual_app` :
-  elle est aujourd'hui d'environ **91 %**, avec un plancher à **85 %** qui fait
+  elle est aujourd'hui d'environ **93 %**, avec un plancher à **85 %** qui fait
   échouer la CI si elle s'effondre. Le seuil est défini par `fail_under` dans
   [pyproject.toml](pyproject.toml), et `--cov-report=term-missing` indique les
   lignes non couvertes.
+
+### Régénérer les illustrations
+
+Les captures et le GIF de ce README sont produits hors écran par l'application
+elle-même, sans capture d'écran :
+
+```bash
+QT_QPA_PLATFORM=offscreen python tools/make_docs_images.py
+QT_QPA_PLATFORM=offscreen python tools/make_docs_images.py --only settings
+```
+
+Le script compose chaque scène (fond de bureau, fenêtre factice, ombre), puis y
+place une vraie capture de l'overlay ou de la fenêtre de réglages. Le GIF est
+assemblé avec `ffmpeg`, requis pour cette seule image ; `--only` accepte
+`standard`, `masked`, `keyboard`, `settings`, `key-editor` et `demo`.
 
 ## Lancement
 
@@ -430,6 +458,8 @@ L'onglet **Touches** de la fenêtre de personnalisation change la forme des
 touches : **Arrondie**, **Carrée**, **Ronde**, **Pilule**, **Hexagone**,
 **Losange**, **Fleur** ou **Étoile**. Les vignettes montrent chaque forme sur
 un fond de panneau, comme dans l'overlay.
+
+![Onglet Touches : forme par défaut, grille du clavier et deux exceptions (A en fleur, Entrée en étoile)](docs/images/key-editor.png)
 
 - **Forme par défaut** s'applique à toutes les touches qui n'ont pas
 exception ; le changement se voit immédiatement dans l'aperçu.
@@ -1082,9 +1112,10 @@ pressvisual_app/      Code de l'application
   tray.py             Icône de notification et menu
   cli.py              Ligne de commande et démarrage
 translations/         Catalogues de traduction (.ts source, .qm compilé)
-tools/                Compilation des .ts en .qm, builds AppImage, Windows et macOS
+tools/                Compilation des .ts en .qm, builds, captures du README
 tests/                Suite de tests hors écran (pytest)
-docs/images/          Captures d'écran utilisées par ce README
+docs/images/          Captures d'écran utilisées par ce README, générées par
+                      tools/make_docs_images.py
 .github/workflows/    Intégration continue (tests, qualité, releases Linux/Windows)
 requirements.txt      Dépendances d'exécution
 requirements-dev.txt  Dépendances de développement (pytest, couverture, ruff)
