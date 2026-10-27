@@ -11,7 +11,7 @@ from PyQt6.QtGui import QGuiApplication, QMouseEvent
 
 import pressvisual
 from pressvisual import KeyEvent, MouseEvent
-from pressvisual_app import overlay as overlay_module
+from pressvisual_app import rows as rows_module
 
 
 def items(overlay) -> list[list[tuple[str, str]]]:
@@ -29,7 +29,7 @@ def finish_animation(overlay) -> None:
         (row, start - 10.0, style, height)
         for row, start, style, height in overlay._row_appearances
     ]
-    overlay._step_row_animations()
+    rows_module.step_animations(overlay)
 
 
 # ---------------------------------------------------------------------------
@@ -213,9 +213,9 @@ def test_bounce_animation_settles_on_the_final_size(overlay):
 
 
 def test_bounce_curve_overshoots_its_target():
-    assert overlay_module._ease_out_back(1.0) == 1.0
+    assert rows_module.ease_out_back(1.0) == 1.0
     # Passé les trois quarts du parcours, la valeur dépasse 1 avant de revenir.
-    assert overlay_module._ease_out_back(0.8) > 1.0
+    assert rows_module.ease_out_back(0.8) > 1.0
 
 
 def test_grow_animation_opens_the_row(overlay):
@@ -230,13 +230,13 @@ def test_grow_animation_opens_the_row(overlay):
 
     assert row._appear == 1.0
     # Une fois déroulée, la ligne reprend sa hauteur naturelle.
-    assert row.maximumHeight() == overlay_module.ROW_MAX_HEIGHT
+    assert row.maximumHeight() == rows_module.ROW_MAX_HEIGHT
 
 
 def test_clearing_rows_stops_the_animation(overlay):
     overlay._on_key(KeyEvent(token="a", char="a"))
 
-    overlay._clear_rows()
+    rows_module.clear(overlay)
 
     assert overlay._row_appearances == []
     assert not overlay._row_animation_timer.isActive()
@@ -246,7 +246,7 @@ def test_removed_row_is_forgotten_by_the_animation(overlay):
     overlay._on_key(KeyEvent(token="a", char="a"))
     overlay._on_key(KeyEvent(token="b", char="b"))
 
-    overlay._remove_row(overlay._rows[0])
+    rows_module.remove(overlay, overlay._rows[0])
     finish_animation(overlay)
 
     assert [row._appear for row in overlay._rows] == [1.0]
@@ -355,7 +355,7 @@ def test_finish_text_keeps_the_row(overlay, config):
     config.concat_text = True
     overlay._on_key(KeyEvent(token="a", char="a"))
 
-    overlay._finish_text()
+    rows_module.finish_text(overlay)
 
     assert items(overlay) == [[("a", "text")]]
     assert overlay._text_row is None
@@ -415,7 +415,7 @@ def test_long_text_is_truncated_from_the_start(overlay, config):
     config.concat_text = True
     text = "m" * 200
 
-    fitted = overlay._fit_text(text)
+    fitted = rows_module.fit_text(overlay, text)
 
     assert fitted.startswith("… ")
     assert len(fitted) < len(text)
@@ -424,7 +424,7 @@ def test_long_text_is_truncated_from_the_start(overlay, config):
 
 
 def test_short_text_is_untouched(overlay):
-    assert overlay._fit_text("bonjour") == "bonjour"
+    assert rows_module.fit_text(overlay, "bonjour") == "bonjour"
 
 
 # ---------------------------------------------------------------------------

@@ -1139,6 +1139,8 @@ pressvisual_app/      Code de l'application
   mouse.py            Souris schématique (boutons et molette)
   widgets.py          Pastilles et lignes de badges
   overlay.py          Fenêtre flottante
+  rows.py             Lignes de la bulle : comptage des appuis, texte continu,
+                      combinaisons et apparitions animées
   appearance.py       Fenêtre de personnalisation et aperçu
   icon.py             Icône de l'application
   tray.py             Icône de notification et menu

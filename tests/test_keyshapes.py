@@ -8,6 +8,7 @@ from PyQt6.QtCore import QPointF, QRectF
 from PyQt6.QtGui import QFont
 
 import pressvisual
+from pressvisual_app import rows as rows_module
 from pressvisual_app.shapes import key_shape_path
 
 # ---------------------------------------------------------------------------
@@ -197,7 +198,7 @@ def test_wide_diamond_keeps_its_points():
 def test_bubble_keys_take_the_configured_shape(qapp, overlay):
     overlay._cfg.key_shape = "flower"
 
-    row = overlay._new_row([("A", "key")])
+    row = rows_module.new_row(overlay, [("A", "key")])
 
     assert [badge.shape for badge in row._badges] == ["flower"]
 
@@ -206,7 +207,7 @@ def test_bubble_shapes_can_be_set_per_key(qapp, overlay):
     overlay._cfg.key_shape = "rounded"
     overlay._cfg.key_shapes = {"A": "star", "Ctrl": "pill"}
 
-    row = overlay._new_row([("Ctrl", "mod"), ("+", "plus"), ("A", "key")])
+    row = rows_module.new_row(overlay, [("Ctrl", "mod"), ("+", "plus"), ("A", "key")])
 
     assert [badge.shape for badge in row._badges] == ["pill", "rounded", "star"]
 
@@ -214,13 +215,13 @@ def test_bubble_shapes_can_be_set_per_key(qapp, overlay):
 def test_bubble_leaves_clicks_and_typed_text_rounded(qapp, overlay):
     overlay._cfg.key_shape = "star"
 
-    row = overlay._new_row([("Clic gauche", "mouse"), ("bonjour", "text")])
+    row = rows_module.new_row(overlay, [("Clic gauche", "mouse"), ("bonjour", "text")])
 
     assert [badge.shape for badge in row._badges] == ["rounded", "rounded"]
 
 
 def test_bubble_shapes_follow_a_saved_setting(qapp, overlay):
-    row = overlay._new_row([("A", "key")])
+    row = rows_module.new_row(overlay, [("A", "key")])
 
     overlay.apply_appearance({"key_shape": "star"})
 

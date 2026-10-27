@@ -107,11 +107,11 @@ from .mouse import (
 )
 from .overlay import (
     KEYBOARD_MAX_LIT,
-    MAX_TEXT_LENGTH,
     RESIZE_GRIP_SIZE,
     SCROLL_AGGREGATE_WINDOW,
     Overlay,
 )
+from .rows import MAX_TEXT_LENGTH
 from .theme import Palette, _blend, _config_color, _luminance, _with_alpha
 from .tray import TrayController
 from .widgets import Badge, KeyRow

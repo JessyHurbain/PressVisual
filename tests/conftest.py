@@ -23,7 +23,7 @@ import pytest  # noqa: E402 - après le réglage de QT_QPA_PLATFORM
 from PyQt6.QtWidgets import QApplication  # noqa: E402
 
 import pressvisual  # noqa: E402 - dépend du réglage ci-dessus
-from pressvisual_app import diagnostics  # noqa: E402 - idem
+from pressvisual_app import diagnostics, rows  # noqa: E402 - idem
 
 
 @pytest.fixture(autouse=True)
@@ -63,7 +63,7 @@ def overlay(qapp, config):
     widget = pressvisual.Overlay(config)
     yield widget
     widget._hide_now()
-    widget._clear_rows()
+    rows.clear(widget)
     widget.hide()
     widget.deleteLater()
     qapp.processEvents()

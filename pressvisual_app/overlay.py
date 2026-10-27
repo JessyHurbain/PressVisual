@@ -33,6 +33,7 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QDialog, QMessageBox, QVBoxLayout, QWidget
 
+from . import rows
 from .appearance import AppearanceDialog, _choose_font_family
 from .config import (
     APPEARANCE_CONFIG_KEYS,
@@ -50,10 +51,8 @@ from .keymap import (
     MULTI_CLICK_LABELS,
     POSITION_CHOICES,
     POSITION_LABELS,
-    ROW_ANIMATIONS,
     SLIDE_DIRECTIONS,
     key_label,
-    key_shape_for,
     modifier_label,
     should_use_combo,
     transition_geometry,
@@ -62,29 +61,12 @@ from .mouse import MOUSE_SCROLL_FLASH_MS
 from .theme import Palette, _with_alpha
 from .widgets import KeyRow
 
-#: Longueur maximale du tampon de texte affiché.
-MAX_TEXT_LENGTH = 200
 #: Fenêtre de temps (s) d'agrégation des événements de molette.
 SCROLL_AGGREGATE_WINDOW = 0.9
 #: Nombre maximal de touches allumées simultanément (sécurité anti-blocage).
 KEYBOARD_MAX_LIT = 16
-#: Durée de l'apparition d'une ligne de l'overlay standard (ms).
-ROW_ANIMATION_MS = 180
-#: Cadence de rafraîchissement des apparitions (ms), soit ~60 images/s.
-ROW_ANIMATION_TICK_MS = 16
-#: Course des animations « glisser » et « chute », en pixels.
-ROW_SHIFT_PX = 14.0
-#: Hauteur maximale d'un widget Qt (valeur « sans limite »).
-ROW_MAX_HEIGHT = 16777215
 #: Côté de la zone de la poignée qui redimensionne le clavier (px).
 RESIZE_GRIP_SIZE = 22
-
-
-def _ease_out_back(progress: float) -> float:
-    """Sortie qui dépasse sa cible avant de se poser (rebond)."""
-    c1 = 1.70158
-    c3 = c1 + 1.0
-    return 1.0 + c3 * (progress - 1.0) ** 3 + c1 * (progress - 1.0) ** 2
 
 
 class Overlay(QWidget):
@@ -134,7 +116,7 @@ class Overlay(QWidget):
         #: Apparitions en cours : (ligne, départ, style, hauteur finale).
         self._row_appearances: list[tuple[KeyRow, float, str, int]] = []
         self._row_animation_timer = QTimer(self)
-        self._row_animation_timer.setInterval(ROW_ANIMATION_TICK_MS)
+        self._row_animation_timer.setInterval(rows.ROW_ANIMATION_TICK_MS)
         self._row_animation_timer.timeout.connect(self._step_row_animations)
 
         self._capture_enabled = not config.start_hidden
@@ -281,7 +263,7 @@ class Overlay(QWidget):
         for row in self._rows:
             row.set_font(self._badge_font)
         if self._text_row is not None:
-            self._render_text()
+            rows.render_text(self)
         self._apply_display_mode()
 
         # Une marge différente doit replacer un coin préréglé ; un
@@ -310,7 +292,7 @@ class Overlay(QWidget):
             return
 
         self._mode = mode
-        self._clear_rows()
+        rows.clear(self)
         self._clear_keyboard()
         if mode == "keyboard":
             self._layout.addWidget(self._visual)
@@ -896,7 +878,7 @@ class Overlay(QWidget):
         self._slide_style = ""
         self._slide_origin = None
         self.setWindowOpacity(1.0)
-        self._clear_rows()
+        rows.clear(self)
         self._clear_keyboard()
         # Après un glissement, la bulle reprend sa place pour la prochaine
         # fois ; un second passage rattrape le déplacement que la plateforme
@@ -966,317 +948,24 @@ class Overlay(QWidget):
             self._cursor_badge = None
         super().closeEvent(event)
 
-    # ------------------------------------------------------------------
-    # Lignes de l'overlay
-    # ------------------------------------------------------------------
-    def _new_row(self, items: Iterable[tuple[str, str]]) -> KeyRow:
-        row = KeyRow(
-            self._badge_font,
-            self._palette,
-            self,
-            # La bulle suit les formes de l'éditeur de touches ; la règle est
-            # relue à chaque badge pour qu'un réglage s'applique sans
-            # reconstruire les lignes.
-            shape_for=lambda label: key_shape_for(self._cfg, label),
-        )
-        row.set_items(items)
-        self._rows.append(row)
-        self._layout.addWidget(row)
-        self._trim_rows()
-        self._update_levels()
-        self._relayout()
-        self._bump()
-        self._animate_row(row)
-        return row
-
-    def _row_animation(self) -> str:
-        """Animation d'apparition des lignes, relue dans la configuration."""
-        style = str(self._cfg.row_animation or "fade").strip().lower()
-        return style if style in ROW_ANIMATIONS else "fade"
-
-    def _animate_row(self, row: KeyRow) -> None:
-        """Fait apparaître une nouvelle ligne avec l'animation choisie.
-
-        Un seul minuteur pilote toutes les apparitions : les lignes retirées
-        avant la fin sont simplement oubliées au passage suivant, sans objet
-        Qt à détruire en cours de route.
-        """
-        style = self._row_animation()
-        if style == "none":
-            return
-
-        height = 0
-        row.set_appear(0.0)
-        if style == "grow":
-            # La ligne s'ouvre en hauteur : la bulle grandit pour lui faire
-            # place, comme un volet qui se déroule.
-            height = max(1, row.sizeHint().height())
-            row.setMaximumHeight(0)
-        elif style in ("zoom", "bounce"):
-            # Les pastilles grossissent depuis leur centre, à place constante.
-            row.set_zoom(0.7)
-        elif style == "slide":
-            row.set_offset(-ROW_SHIFT_PX, 0.0)
-        elif style == "drop":
-            row.set_offset(0.0, -ROW_SHIFT_PX)
-
-        self._row_appearances.append((row, time.monotonic(), style, height))
-        if not self._row_animation_timer.isActive():
-            self._row_animation_timer.start()
-
-    def _step_row_animations(self) -> None:
-        """Avance les apparitions en cours et arrête le minuteur à la fin."""
-        now = time.monotonic()
-        duration = max(1, ROW_ANIMATION_MS)
-        remaining: list[tuple[KeyRow, float, str, int]] = []
-        grew = False
-
-        for row, start, style, height in self._row_appearances:
-            if row not in self._rows:
-                # Ligne retirée entre-temps : plus rien à animer.
-                continue
-            progress = min(1.0, (now - start) * 1000.0 / duration)
-            # Sortie douce : rapide au début, posée à l'arrivée.
-            eased = 1.0 - (1.0 - progress) ** 3
-            if style == "bounce":
-                # L'opacité monte vite pour que le rebond se voie.
-                row.set_appear(min(1.0, progress * 2.5))
-                row.set_zoom(0.7 + 0.3 * _ease_out_back(progress))
-            else:
-                row.set_appear(eased)
-            if style == "grow":
-                row.setMaximumHeight(max(1, int(round(height * eased))))
-                grew = True
-            elif style == "zoom":
-                row.set_zoom(0.7 + 0.3 * eased)
-            elif style == "slide":
-                row.set_offset(-ROW_SHIFT_PX * (1.0 - eased), 0.0)
-            elif style == "drop":
-                row.set_offset(0.0, -ROW_SHIFT_PX * (1.0 - eased))
-
-            if progress < 1.0:
-                remaining.append((row, start, style, height))
-                continue
-            # Arrivée : la ligne reprend exactement sa place et sa taille.
-            row.set_appear(1.0)
-            row.set_zoom(1.0)
-            row.set_offset(0.0, 0.0)
-            if style == "grow":
-                row.setMaximumHeight(ROW_MAX_HEIGHT)
-
-        self._row_appearances = remaining
-        if grew:
-            self._relayout()
-        if not self._row_appearances:
-            self._row_animation_timer.stop()
-
-    def _merge_repeat(self, row: KeyRow) -> None:
-        """Absorbe une ligne identique à la précédente en « ×N ».
-
-        Deux appuis de suite sur la même touche ne doivent pas empiler deux
-        pastilles identiques : la première compte les appuis. Une touche
-        intercalée, un texte, une ligne de souris ou un passage masqué
-        interrompt le compte.
-        """
-        previous = self._repeat_target(row)
-        if previous is None:
-            self._repeat_row = row
-            return
-        self._remove_row(row)
-        # Le premier compteur vaut « ×2 » : la pastille gardée est le premier
-        # appui, la ligne absorbée est le second.
-        previous.set_count(max(2, previous.count + 1))
-        self._repeat_row = previous
-        self._update_levels()
-        self._relayout()
-        self._bump()
-
-    def _repeat_target(self, row: KeyRow) -> Optional[KeyRow]:
-        """Ligne qui peut compter l'appui, si c'est bien le même."""
-        if not self._cfg.count_repeats or row not in self._rows:
-            return None
-        items = row.items
-        if not items or any(kind == "text" for _, kind in items):
-            return None
-        index = self._rows.index(row)
-        if index == 0:
-            return None
-        previous = self._rows[index - 1]
-        # Seule la ligne de l'appui précédent compte : après une autre touche
-        # ou un passage masqué, l'appui repart de un.
-        if previous is not self._repeat_row or previous.items != items:
-            return None
-        return previous
-
-    def _remove_row(self, row: Optional[KeyRow]) -> None:
-        if row is None or row not in self._rows:
-            return
-        self._rows.remove(row)
-        self._layout.removeWidget(row)
-        row.setParent(None)
-        row.deleteLater()
-        if row is self._text_row:
-            self._text_row = None
-            self._text = ""
-        if row is self._combo_row:
-            self._combo_row = None
-        if row is self._scroll_row:
-            self._scroll_row = None
-        if row is self._last_left_row:
-            self._last_left_row = None
-        if row is self._repeat_row:
-            self._repeat_row = None
-        self._update_levels()
-        self._relayout()
-
-    def _trim_rows(self) -> None:
-        while len(self._rows) > self._cfg.max_rows:
-            old = self._rows.pop(0)
-            self._layout.removeWidget(old)
-            old.setParent(None)
-            old.deleteLater()
-            if old is self._text_row:
-                self._text_row = None
-                self._text = ""
-            if old is self._combo_row:
-                self._combo_row = None
-            if old is self._scroll_row:
-                self._scroll_row = None
-            if old is self._last_left_row:
-                self._last_left_row = None
-            if old is self._repeat_row:
-                self._repeat_row = None
-
-    def _update_levels(self) -> None:
-        levels = (1.0, 0.62, 0.34)
-        count = len(self._rows)
-        for index, row in enumerate(self._rows):
-            depth = count - 1 - index
-            row.set_alpha(levels[min(depth, len(levels) - 1)])
-
-    def _clear_rows(self) -> None:
-        for row in self._rows:
-            self._layout.removeWidget(row)
-            row.setParent(None)
-            row.deleteLater()
-        self._rows.clear()
-        self._text_row = None
-        self._text = ""
-        self._combo_row = None
-        self._scroll_row = None
-        self._last_left_row = None
-        self._repeat_row = None
-        # Les lignes animées viennent de disparaître : plus rien à faire
-        # avancer.
-        self._row_appearances.clear()
-        self._row_animation_timer.stop()
-        self._typing_timer.stop()
-        self._relayout()
-
-    # ------------------------------------------------------------------
-    # Construction des badges
-    # ------------------------------------------------------------------
-    def _combo_items(
-        self,
-        mods: Iterable[str],
-        key: Optional[str] = None,
-        key_kind: str = "key",
-    ) -> list[tuple[str, str]]:
-        parts: list[tuple[str, str]] = [
-            (modifier_label(self._cfg, mod), "mod")
-            for mod in MODIFIER_ORDER
-            if mod in set(mods)
-        ]
-        if key is not None:
-            parts.append((key, key_kind))
-
-        items: list[tuple[str, str]] = []
-        for index, part in enumerate(parts):
-            if index:
-                items.append(("+", "plus"))
-            items.append(part)
-        return items
-
-    def _mouse_items(
-        self, mods: Iterable[str], label: str
-    ) -> list[tuple[str, str]]:
-        """Badges d'un clic ou d'un cran de molette, modificateurs compris."""
-        return self._combo_items(mods, label, key_kind="mouse")
-
-    def _event_key_label(self, event: KeyEvent) -> str:
-        if event.char:
-            return event.char.upper() if len(event.char) == 1 else event.char
-        return key_label(self._cfg, event.token)
-
-    def _fit_text(self, text: str) -> str:
-        """Tronque le début du texte pour tenir dans la largeur maximale."""
-        if not text:
-            return ""
-        limit = max(140, self._cfg.max_width - 40)
-        if self._text_metrics.horizontalAdvance(text) <= limit:
-            return text
-        trimmed = text
-        while trimmed and self._text_metrics.horizontalAdvance("… " + trimmed) > limit:
-            trimmed = trimmed[1:]
-        return "… " + trimmed if trimmed else "…"
-
-    # ------------------------------------------------------------------
-    # Texte continu
-    # ------------------------------------------------------------------
-    def _add_text_char(self, char: str) -> None:
-        if self._masked:
-            char = "•"
-
-        if self._text_row is None and not self._text:
-            if char.isspace():
-                return
-            self._text_row = self._new_row([])
-            self._text = char
-        else:
-            self._text += char
-            if len(self._text) > MAX_TEXT_LENGTH:
-                self._text = self._text[-MAX_TEXT_LENGTH:]
-
-        self._render_text()
-        self._typing_timer.start(int(self._cfg.typing_join_delay * 1000))
-        self._bump()
-
-    def _render_text(self) -> None:
-        if self._text_row is None:
-            return
-        display = self._fit_text(self._text.rstrip())
-        self._text_row.set_items([(display, "text")] if display else [])
-        self._relayout()
-
-    def _finish_text(self) -> None:
-        self._typing_timer.stop()
-        if self._text_row is None:
-            return
-        text = self._text.rstrip()
-        if text:
-            self._text_row.set_items([(self._fit_text(text), "text")])
-        else:
-            self._remove_row(self._text_row)
-        self._text_row = None
-        self._text = ""
-        self._relayout()
-
-    def _flush_typing(self) -> None:
-        if self._text_row is not None or self._text:
-            self._finish_text()
-
-    # ------------------------------------------------------------------
-    # Combinaisons et touches spéciales
-    # ------------------------------------------------------------------
-    def _close_combo(self, remove: bool = False) -> None:
-        row = self._combo_row
-        self._combo_row = None
-        if row is not None and remove:
-            self._remove_row(row)
 
     def cancel_live_combo(self) -> None:
         """Retire la ligne de modificateurs en cours (raccourci global)."""
-        self._close_combo(remove=True)
+        rows.close_combo(self, remove_row=True)
+
+    # ------------------------------------------------------------------
+    # Minuteries des lignes
+    # ------------------------------------------------------------------
+    # Ces deux relais sont connectés aux minuteurs : PyQt rattache une
+    # connexion à son destinataire quand celui-ci est un objet de la fenêtre,
+    # ce qu'une fonction anonyme ne permettrait pas.
+    def _step_row_animations(self) -> None:
+        """Avance les apparitions en cours (voir :func:`rows.step_animations`)."""
+        rows.step_animations(self)
+
+    def _finish_text(self) -> None:
+        """Referme le texte continu (voir :func:`rows.finish_text`)."""
+        rows.finish_text(self)
 
     def _on_modifiers(self, mods: Iterable[str]) -> None:
         if not self._capture_enabled:
@@ -1296,8 +985,8 @@ class Overlay(QWidget):
                 self._combo_row = None
                 self._bump()
                 return
-            self._combo_row.set_items(self._combo_items(snapshot))
-            self._update_levels()
+            self._combo_row.set_items(rows.combo_items(self, snapshot))
+            rows.update_levels(self)
             self._relayout()
             self._bump()
             return
@@ -1308,8 +997,8 @@ class Overlay(QWidget):
         if not ({"ctrl", "alt", "win"} & set(snapshot)):
             return
 
-        self._flush_typing()
-        self._combo_row = self._new_row(self._combo_items(snapshot))
+        rows.flush_typing(self)
+        self._combo_row = rows.new_row(self, rows.combo_items(self, snapshot))
         self._bump()
 
     def _on_modifier_sides(self, sides: Iterable[str]) -> None:
@@ -1337,63 +1026,63 @@ class Overlay(QWidget):
             and plain
             and self._text_row is not None
         ):
-            self._close_combo()
+            rows.close_combo(self)
             self._scroll_row = None
             self._text = self._text[:-1]
             if self._text:
-                self._render_text()
+                rows.render_text(self)
                 self._typing_timer.start(int(self._cfg.typing_join_delay * 1000))
                 self._bump()
             else:
                 row = self._text_row
                 self._text_row = None
-                self._remove_row(row)
+                rows.remove(self, row)
                 self._bump()
             return
 
         # Espace : prolonge le mot en cours, ou s'affiche seul en début de ligne.
         if self._cfg.concat_text and event.token == "space" and plain:
-            self._close_combo()
+            rows.close_combo(self)
             self._scroll_row = None
             if self._text_row is None and not self._text:
-                self._merge_repeat(
-                    self._new_row([(key_label(self._cfg, "space"), "key")])
+                rows.merge_repeat(
+                    self, rows.new_row(self, [(key_label(self._cfg, "space"), "key")])
                 )
             else:
-                self._add_text_char(" ")
+                rows.add_text_char(self, " ")
             return
 
         if event.char and not should_use_combo(mods, event.char):
             # Caractère accentué alors que Ctrl/Alt sont enfoncés : il s'agit
             # d'AltGr. La ligne de modificateurs affichée était transitoire.
             if ord(event.char) > 0x7F and ({"ctrl", "alt"} & set(mods)):
-                self._close_combo(remove=True)
+                rows.close_combo(self, remove_row=True)
             else:
-                self._close_combo()
+                rows.close_combo(self)
             self._scroll_row = None
             if self._cfg.concat_text:
-                self._add_text_char(event.char)
+                rows.add_text_char(self, event.char)
             else:
                 # Mode touche par touche : une pastille par caractère.
                 label = "•" if self._masked else event.char
-                self._merge_repeat(self._new_row([(label, "key")]))
+                rows.merge_repeat(self, rows.new_row(self, [(label, "key")]))
             return
 
         # Touche spéciale (Entrée, Tab, flèches...) ou combinaison.
-        self._flush_typing()
+        rows.flush_typing(self)
         self._scroll_row = None
-        items = self._combo_items(mods, self._event_key_label(event))
+        items = rows.combo_items(self, mods, rows.event_key_label(self, event))
 
         if self._combo_row is not None:
             row = self._combo_row
             self._combo_row = None
             row.set_items(items)
-            self._update_levels()
+            rows.update_levels(self)
             self._relayout()
             self._bump()
-            self._merge_repeat(row)
+            rows.merge_repeat(self, row)
         else:
-            self._merge_repeat(self._new_row(items))
+            rows.merge_repeat(self, rows.new_row(self, items))
 
     # ------------------------------------------------------------------
     # Souris
@@ -1518,22 +1207,22 @@ class Overlay(QWidget):
             self._scroll_time = now
             base = self._scroll_label(axis, self._scroll_direction)
             self._scroll_row.set_items(
-                self._mouse_items(mods, f"{base} ×{self._scroll_count}")
+                rows.mouse_items(self, mods, f"{base} ×{self._scroll_count}")
             )
-            self._update_levels()
+            rows.update_levels(self)
             self._relayout()
             self._bump()
             return
 
-        self._flush_typing()
-        self._close_combo(remove=True)
+        rows.flush_typing(self)
+        rows.close_combo(self, remove_row=True)
         self._scroll_direction = event.direction
         self._scroll_axis = axis
         self._scroll_count = 1
         self._scroll_time = now
         self._scroll_mods = mods
         base = self._scroll_label(axis, event.direction)
-        self._scroll_row = self._new_row(self._mouse_items(mods, base))
+        self._scroll_row = rows.new_row(self, rows.mouse_items(self, mods, base))
         self._last_left_row = None
 
     def _scroll_label(self, axis: str, direction: int) -> str:
@@ -1582,20 +1271,20 @@ class Overlay(QWidget):
             and now - self._last_left_time <= 0.9
         ):
             label = _t(MULTI_CLICK_LABELS.get(event.count, MULTI_CLICK_LABELS[3]))
-            self._last_left_row.set_items(self._mouse_items(mods, label))
+            self._last_left_row.set_items(rows.mouse_items(self, mods, label))
             self._last_left_time = now
-            self._update_levels()
+            rows.update_levels(self)
             self._relayout()
             self._bump()
             return
 
-        self._flush_typing()
-        self._close_combo(remove=True)
+        rows.flush_typing(self)
+        rows.close_combo(self, remove_row=True)
         self._scroll_row = None
 
         label = self._click_label(event)
 
-        row = self._new_row(self._mouse_items(mods, label))
+        row = rows.new_row(self, rows.mouse_items(self, mods, label))
         if button == "left":
             self._last_left_row = row
             self._last_left_time = now
@@ -1613,10 +1302,10 @@ class Overlay(QWidget):
         # Le mode clavier n'affiche pas de ligne de texte.
         if self._mode == "keyboard":
             return
-        self._flush_typing()
-        self._close_combo(remove=True)
+        rows.flush_typing(self)
+        rows.close_combo(self, remove_row=True)
         self._scroll_row = None
-        self._new_row([(text, "status")])
+        rows.new_row(self, [(text, "status")])
 
     def set_capture_enabled(self, enabled: bool, announce: bool = False) -> None:
         """Active ou suspend la capture affichée (mode privé)."""
@@ -1629,7 +1318,7 @@ class Overlay(QWidget):
                 self._status(_t("Capture activée"))
         else:
             self._hide_now()
-            self._clear_rows()
+            rows.clear(self)
             self._clear_keyboard()
         self.state_changed.emit()
 
@@ -1672,7 +1361,7 @@ class Overlay(QWidget):
     def toggle_masking(self) -> None:
         """Active/désactive le masquage des caractères saisis."""
         self._masked = not self._masked
-        self._clear_rows()
+        rows.clear(self)
         self._keyboard.set_masked(self._masked)
         self._status(
             _t("Masquage des frappes : activé")
