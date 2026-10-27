@@ -438,6 +438,41 @@ def test_dialog_exposes_mouse_tracking(qapp, config):
         dialog.deleteLater()
 
 
+def test_dialog_exposes_row_animations(qapp, config):
+    dialog = make_dialog(qapp, config)
+    try:
+        choices = [
+            dialog.animation_combo.itemData(index)
+            for index in range(dialog.animation_combo.count())
+        ]
+
+        assert choices == ["fade", "zoom", "grow", "none"]
+        assert dialog.animation_combo.currentData() == "fade"
+        assert dialog.values()["row_animation"] == "fade"
+
+        dialog.animation_combo.setCurrentIndex(
+            dialog.animation_combo.findData("grow")
+        )
+        assert dialog.values()["row_animation"] == "grow"
+
+        dialog._reset()
+        assert dialog.animation_combo.currentData() == "fade"
+    finally:
+        dialog.deleteLater()
+
+
+def test_every_setting_of_the_dialog_is_saved(qapp, config):
+    # Le fichier ne retient que les clés connues : un réglage absent de cette
+    # liste serait appliqué puis perdu au redémarrage.
+    dialog = make_dialog(qapp, config)
+    try:
+        missing = set(dialog.values()) - set(pressvisual.APPEARANCE_CONFIG_KEYS)
+
+        assert missing == set()
+    finally:
+        dialog.deleteLater()
+
+
 def test_dialog_exposes_repeat_counting(qapp, config):
     dialog = make_dialog(qapp, config)
     try:

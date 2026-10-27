@@ -58,6 +58,9 @@ class Badge(QWidget):
         self._metrics = QFontMetrics(self._font)
         self._palette = palette
         self._alpha = 1.0
+        #: Avancement de l'apparition (0 = invisible) et échelle de « zoom ».
+        self._appear = 1.0
+        self._zoom = 1.0
         # Seules les touches prennent une forme : un clic ou un texte saisi
         # restent des pastilles, comme avant.
         self._shape = shape if kind in ("key", "mod") else "rounded"
@@ -74,6 +77,20 @@ class Badge(QWidget):
         alpha = max(0.0, min(1.0, alpha))
         if abs(alpha - self._alpha) > 0.001:
             self._alpha = alpha
+            self.update()
+
+    def set_appear(self, appear: float) -> None:
+        """Opacité d'apparition de la pastille (0 = transparente)."""
+        appear = max(0.0, min(1.0, float(appear)))
+        if abs(appear - self._appear) > 0.001:
+            self._appear = appear
+            self.update()
+
+    def set_zoom(self, zoom: float) -> None:
+        """Échelle du contenu, pour l'animation « zoom » (1 = taille normale)."""
+        zoom = max(0.1, min(1.5, float(zoom)))
+        if abs(zoom - self._zoom) > 0.001:
+            self._zoom = zoom
             self.update()
 
     def sizeHint(self) -> QSize:  # noqa: N802 - API Qt
@@ -100,7 +117,14 @@ class Badge(QWidget):
         painter.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
         painter.setFont(self._font)
 
-        alpha = self._alpha
+        # L'animation d'apparition module l'opacité et, pour « zoom », la
+        # taille du contenu : la place réservée dans la ligne ne bouge pas.
+        alpha = self._alpha * self._appear
+        if self._zoom != 1.0:
+            center = QRectF(self.rect()).center()
+            painter.translate(center)
+            painter.scale(self._zoom, self._zoom)
+            painter.translate(-center)
         rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
         radius = min(9.0, rect.height() / 2.0)
 
@@ -186,6 +210,8 @@ class KeyRow(QWidget):
         self._count = 0
         self._badges: list[Badge] = []
         self._alpha = 1.0
+        self._appear = 1.0
+        self._zoom = 1.0
         self._layout = QHBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setSpacing(5)
@@ -245,6 +271,8 @@ class KeyRow(QWidget):
                 label, kind, self._font, self._palette, parent=self, shape=shape
             )
             badge.set_alpha(self._alpha)
+            badge.set_appear(self._appear)
+            badge.set_zoom(self._zoom)
             self._layout.addWidget(badge)
             self._badges.append(badge)
 
@@ -255,3 +283,15 @@ class KeyRow(QWidget):
         self._alpha = alpha
         for badge in self._badges:
             badge.set_alpha(alpha)
+
+    def set_appear(self, appear: float) -> None:
+        """Fait apparaître la ligne entière (opacité de tous ses badges)."""
+        self._appear = max(0.0, min(1.0, float(appear)))
+        for badge in self._badges:
+            badge.set_appear(self._appear)
+
+    def set_zoom(self, zoom: float) -> None:
+        """Grossit ou rétrécit le contenu de la ligne, sans changer sa place."""
+        self._zoom = max(0.1, min(1.5, float(zoom)))
+        for badge in self._badges:
+            badge.set_zoom(self._zoom)

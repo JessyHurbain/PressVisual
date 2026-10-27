@@ -11,6 +11,7 @@ from PyQt6.QtGui import QGuiApplication, QMouseEvent
 
 import pressvisual
 from pressvisual import KeyEvent, MouseEvent
+from pressvisual_app import overlay as overlay_module
 
 
 def items(overlay) -> list[list[tuple[str, str]]]:
@@ -20,6 +21,15 @@ def items(overlay) -> list[list[tuple[str, str]]]:
 def last_items(overlay) -> list[tuple[str, str]]:
     assert overlay._rows, "aucune ligne affichée"
     return list(overlay._rows[-1]._items)
+
+
+def finish_animation(overlay) -> None:
+    """Amène les apparitions en cours à leur terme, sans attendre l'horloge."""
+    overlay._row_appearances = [
+        (row, start - 10.0, style, height)
+        for row, start, style, height in overlay._row_appearances
+    ]
+    overlay._step_row_animations()
 
 
 # ---------------------------------------------------------------------------
@@ -121,6 +131,81 @@ def test_text_is_not_counted(overlay):
 
     assert items(overlay) == [[("aaa", "text")]]
     assert overlay._rows[0].count == 0
+
+
+# ---------------------------------------------------------------------------
+# Apparition des lignes
+# ---------------------------------------------------------------------------
+
+
+def test_new_row_fades_in_by_default(overlay):
+    overlay._on_key(KeyEvent(token="a", char="a"))
+
+    row = overlay._rows[0]
+    # La ligne est déjà remplie mais encore transparente : elle apparaît.
+    assert items(overlay) == [[("a", "key")]]
+    assert row._appear == 0.0
+    assert overlay._row_animation_timer.isActive()
+
+    finish_animation(overlay)
+
+    assert row._appear == 1.0
+    assert not overlay._row_animation_timer.isActive()
+
+
+def test_row_animation_can_be_disabled(overlay):
+    overlay._cfg.row_animation = "none"
+
+    overlay._on_key(KeyEvent(token="a", char="a"))
+
+    assert overlay._rows[0]._appear == 1.0
+    assert not overlay._row_animation_timer.isActive()
+
+
+def test_zoom_animation_starts_small(overlay):
+    overlay._cfg.row_animation = "zoom"
+
+    overlay._on_key(KeyEvent(token="a", char="a"))
+
+    assert overlay._rows[0]._zoom < 1.0
+
+    finish_animation(overlay)
+
+    assert overlay._rows[0]._zoom == 1.0
+
+
+def test_grow_animation_opens_the_row(overlay):
+    overlay._cfg.row_animation = "grow"
+
+    overlay._on_key(KeyEvent(token="enter", char=None))
+
+    row = overlay._rows[0]
+    assert row.maximumHeight() == 0
+
+    finish_animation(overlay)
+
+    assert row._appear == 1.0
+    # Une fois déroulée, la ligne reprend sa hauteur naturelle.
+    assert row.maximumHeight() == overlay_module.ROW_MAX_HEIGHT
+
+
+def test_clearing_rows_stops_the_animation(overlay):
+    overlay._on_key(KeyEvent(token="a", char="a"))
+
+    overlay._clear_rows()
+
+    assert overlay._row_appearances == []
+    assert not overlay._row_animation_timer.isActive()
+
+
+def test_removed_row_is_forgotten_by_the_animation(overlay):
+    overlay._on_key(KeyEvent(token="a", char="a"))
+    overlay._on_key(KeyEvent(token="b", char="b"))
+
+    overlay._remove_row(overlay._rows[0])
+    finish_animation(overlay)
+
+    assert [row._appear for row in overlay._rows] == [1.0]
 
 
 def test_special_key_uses_french_label(overlay):

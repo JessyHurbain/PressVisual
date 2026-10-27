@@ -330,6 +330,34 @@ def test_repeat_counting_is_on_by_default():
     assert pressvisual.Config().count_repeats is True
 
 
+def test_row_animation_defaults_to_fade():
+    assert pressvisual.Config().row_animation == "fade"
+
+
+def test_validate_rejects_unknown_row_animation():
+    config = pressvisual.Config(row_animation="spin")
+
+    notes = config.validate()
+
+    assert config.row_animation == "fade"
+    assert any("animation" in note for note in notes)
+
+
+def test_save_appearance_keeps_the_row_animation(tmp_path):
+    path = tmp_path / "config.json"
+    config = pressvisual.Config.load(path, lambda _message: None)
+
+    assert config.save_appearance({"row_animation": "grow", "count_repeats": False})
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["row_animation"] == "grow"
+    assert data["count_repeats"] is False
+
+    reloaded = pressvisual.Config.load(path, lambda _message: None)
+    assert reloaded.row_animation == "grow"
+    assert reloaded.count_repeats is False
+
+
 def test_validate_converts_count_repeats():
     config = pressvisual.Config(count_repeats="non")
 

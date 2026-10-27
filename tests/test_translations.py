@@ -216,6 +216,11 @@ def test_display_settings_are_translated(english, qapp, config):
         assert dialog.count_repeats.text() == (
             "Group repeated presses of the same key (×2)"
         )
+        animations = [
+            dialog.animation_combo.itemText(index)
+            for index in range(dialog.animation_combo.count())
+        ]
+        assert animations == ["Fade", "Zoom", "Unfold", "None"]
     finally:
         dialog.deleteLater()
 

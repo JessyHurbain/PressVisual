@@ -50,6 +50,7 @@ from .keymap import (
     MULTI_CLICK_LABELS,
     POSITION_CHOICES,
     POSITION_LABELS,
+    ROW_ANIMATIONS,
     SLIDE_DIRECTIONS,
     key_label,
     key_shape_for,
@@ -67,6 +68,12 @@ MAX_TEXT_LENGTH = 200
 SCROLL_AGGREGATE_WINDOW = 0.9
 #: Nombre maximal de touches allumées simultanément (sécurité anti-blocage).
 KEYBOARD_MAX_LIT = 16
+#: Durée de l'apparition d'une ligne de l'overlay standard (ms).
+ROW_ANIMATION_MS = 180
+#: Cadence de rafraîchissement des apparitions (ms), soit ~60 images/s.
+ROW_ANIMATION_TICK_MS = 16
+#: Hauteur maximale d'un widget Qt (valeur « sans limite »).
+ROW_MAX_HEIGHT = 16777215
 #: Côté de la zone de la poignée qui redimensionne le clavier (px).
 RESIZE_GRIP_SIZE = 22
 
@@ -114,6 +121,11 @@ class Overlay(QWidget):
         self._last_left_time = 0.0
         #: Dernière ligne d'appui : elle peut compter les appuis suivants.
         self._repeat_row: Optional[KeyRow] = None
+        #: Apparitions en cours : (ligne, départ, style, hauteur finale).
+        self._row_appearances: list[tuple[KeyRow, float, str, int]] = []
+        self._row_animation_timer = QTimer(self)
+        self._row_animation_timer.setInterval(ROW_ANIMATION_TICK_MS)
+        self._row_animation_timer.timeout.connect(self._step_row_animations)
 
         self._capture_enabled = not config.start_hidden
         self._click_through = False
@@ -964,7 +976,70 @@ class Overlay(QWidget):
         self._update_levels()
         self._relayout()
         self._bump()
+        self._animate_row(row)
         return row
+
+    def _row_animation(self) -> str:
+        """Animation d'apparition des lignes, relue dans la configuration."""
+        style = str(self._cfg.row_animation or "fade").strip().lower()
+        return style if style in ROW_ANIMATIONS else "fade"
+
+    def _animate_row(self, row: KeyRow) -> None:
+        """Fait apparaître une nouvelle ligne avec l'animation choisie.
+
+        Un seul minuteur pilote toutes les apparitions : les lignes retirées
+        avant la fin sont simplement oubliées au passage suivant, sans objet
+        Qt à détruire en cours de route.
+        """
+        style = self._row_animation()
+        if style == "none":
+            return
+
+        height = 0
+        row.set_appear(0.0)
+        if style == "grow":
+            # La ligne s'ouvre en hauteur : la bulle grandit pour lui faire
+            # place, comme un volet qui se déroule.
+            height = max(1, row.sizeHint().height())
+            row.setMaximumHeight(0)
+        elif style == "zoom":
+            # Les pastilles grossissent depuis leur centre, à place constante.
+            row.set_zoom(0.7)
+
+        self._row_appearances.append((row, time.monotonic(), style, height))
+        if not self._row_animation_timer.isActive():
+            self._row_animation_timer.start()
+
+    def _step_row_animations(self) -> None:
+        """Avance les apparitions en cours et arrête le minuteur à la fin."""
+        now = time.monotonic()
+        duration = max(1, ROW_ANIMATION_MS)
+        remaining: list[tuple[KeyRow, float, str, int]] = []
+        grew = False
+
+        for row, start, style, height in self._row_appearances:
+            if row not in self._rows:
+                # Ligne retirée entre-temps : plus rien à animer.
+                continue
+            progress = min(1.0, (now - start) * 1000.0 / duration)
+            # Sortie douce : rapide au début, posée à l'arrivée.
+            eased = 1.0 - (1.0 - progress) ** 3
+            row.set_appear(eased)
+            if style == "grow":
+                row.setMaximumHeight(max(1, int(round(height * eased))))
+                grew = True
+            elif style == "zoom":
+                row.set_zoom(0.7 + 0.3 * eased)
+            if progress < 1.0:
+                remaining.append((row, start, style, height))
+            elif style == "grow":
+                row.setMaximumHeight(ROW_MAX_HEIGHT)
+
+        self._row_appearances = remaining
+        if grew:
+            self._relayout()
+        if not self._row_appearances:
+            self._row_animation_timer.stop()
 
     def _merge_repeat(self, row: KeyRow) -> None:
         """Absorbe une ligne identique à la précédente en « ×N ».
@@ -1062,6 +1137,10 @@ class Overlay(QWidget):
         self._scroll_row = None
         self._last_left_row = None
         self._repeat_row = None
+        # Les lignes animées viennent de disparaître : plus rien à faire
+        # avancer.
+        self._row_appearances.clear()
+        self._row_animation_timer.stop()
         self._typing_timer.stop()
         self._relayout()
 

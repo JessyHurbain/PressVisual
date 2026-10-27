@@ -536,6 +536,10 @@
         <translation>Unknown transition ({value}): "fade" used.</translation>
     </message>
     <message>
+        <source>animation de ligne inconnue ({value}) : « fade » utilisée.</source>
+        <translation>Unknown line animation ({value}): "fade" used.</translation>
+    </message>
+    <message>
         <source>Fondu</source>
         <translation>Fade</translation>
     </message>
@@ -560,8 +564,16 @@
         <translation>Zoom</translation>
     </message>
     <message>
+        <source>Dérouler</source>
+        <translation>Unfold</translation>
+    </message>
+    <message>
         <source>Aucune</source>
         <translation>None</translation>
+    </message>
+    <message>
+        <source>Animation des lignes</source>
+        <translation>Line animation</translation>
     </message>
     <message>
         <source>Transition de la bulle</source>

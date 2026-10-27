@@ -94,6 +94,16 @@ TRANSITION_LABELS: dict[str, str] = {
     "none": "Aucune",
 }
 
+#: Animations d'apparition des lignes de l'overlay standard.
+ROW_ANIMATIONS: tuple[str, ...] = ("fade", "zoom", "grow", "none")
+
+ROW_ANIMATION_LABELS: dict[str, str] = {
+    "fade": "Fondu",
+    "zoom": "Zoom",
+    "grow": "Dérouler",
+    "none": "Aucune",
+}
+
 #: Sens de sortie des transitions glissées, en fraction de la taille de la
 #: bulle : (dx, dy). L'apparition repart du même bord.
 SLIDE_DIRECTIONS: dict[str, tuple[float, float]] = {

@@ -21,6 +21,7 @@ from .keymap import (
     KEYBOARD_LAYOUTS,
     MOUSE_STYLES,
     POSITION_CHOICES,
+    ROW_ANIMATIONS,
     TRANSITIONS,
 )
 
@@ -58,6 +59,8 @@ APPEARANCE_CONFIG_KEYS: tuple[str, ...] = (
     "key_shapes",
     "transition",
     "transition_out_ms",
+    "row_animation",
+    "count_repeats",
 )
 
 #: Anciens noms de clés, encore lus depuis un fichier existant. La valeur est
@@ -114,6 +117,9 @@ class Config:
     #: slide / slide-up / slide-left / slide-right (glissements), zoom
     #: (rétrécissement), none (immédiate).
     transition: str = "fade"
+    #: Animation d'apparition des lignes de l'overlay standard : fade (fondu),
+    #: zoom (la pastille grossit), grow (la ligne se déroule), none (immédiate).
+    row_animation: str = "fade"
     #: Position libre mémorisée : (x, y, largeur, hauteur).
     free_position: Optional[tuple[int, int, int, int]] = None
     language: str = LANGUAGE_AUTO       # auto (système) | fr | en
@@ -315,6 +321,16 @@ class Config:
             )
             transition = "fade"
         self.transition = transition
+
+        animation = str(self.row_animation or "fade").strip().lower()
+        if animation not in ROW_ANIMATIONS:
+            notes.append(
+                _t(
+                    "animation de ligne inconnue ({value}) : « fade » utilisée."
+                ).format(value=repr(self.row_animation))
+            )
+            animation = "fade"
+        self.row_animation = animation
 
         mode = str(self.display_mode or "overlay").strip().lower()
         if mode not in DISPLAY_MODES:

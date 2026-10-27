@@ -65,6 +65,8 @@ from .keymap import (
     CURSOR_STYLES,
     MOUSE_STYLE_LABELS,
     MOUSE_STYLES,
+    ROW_ANIMATION_LABELS,
+    ROW_ANIMATIONS,
     TRANSITION_LABELS,
     TRANSITIONS,
     key_shape_for,
@@ -857,6 +859,15 @@ class AppearanceDialog(QDialog):
         self.transition_duration.setValue(int(config.transition_out_ms))
         display_form.addRow(_t("Durée de la disparition"), self.transition_duration)
 
+        self.animation_combo = QComboBox(display_group)
+        for value in ROW_ANIMATIONS:
+            self.animation_combo.addItem(_t(ROW_ANIMATION_LABELS[value]), value)
+        index = self.animation_combo.findData(
+            str(config.row_animation).strip().lower()
+        )
+        self.animation_combo.setCurrentIndex(index if index >= 0 else 0)
+        display_form.addRow(_t("Animation des lignes"), self.animation_combo)
+
         interface_group = QGroupBox(_t("Interface"), self)
         interface_form = QFormLayout(interface_group)
         interface_form.setHorizontalSpacing(14)
@@ -953,6 +964,7 @@ class AppearanceDialog(QDialog):
         self.mouse_style_combo.currentIndexChanged.connect(self._refresh_preview)
         self.transition_combo.currentIndexChanged.connect(self._refresh_preview)
         self.transition_duration.valueChanged.connect(self._refresh_preview)
+        self.animation_combo.currentIndexChanged.connect(self._refresh_preview)
         self.key_editor.changed.connect(self._refresh_preview)
         self.layout_combo.currentIndexChanged.connect(self._sync_key_layout)
 
@@ -1022,6 +1034,7 @@ class AppearanceDialog(QDialog):
             **self.key_editor.values(),
             "transition": self.transition_combo.currentData() or "fade",
             "transition_out_ms": self.transition_duration.value(),
+            "row_animation": self.animation_combo.currentData() or "fade",
             "opacity": self.opacity_slider.value() / 100.0,
             "font_family": family,
             "font_size": self.font_size.value(),
@@ -1076,6 +1089,8 @@ class AppearanceDialog(QDialog):
             index = self.transition_combo.findData(defaults.transition)
             self.transition_combo.setCurrentIndex(index if index >= 0 else 0)
             self.transition_duration.setValue(int(defaults.transition_out_ms))
+            index = self.animation_combo.findData(defaults.row_animation)
+            self.animation_combo.setCurrentIndex(index if index >= 0 else 0)
             self.key_editor.reset()
         finally:
             self._updating = False

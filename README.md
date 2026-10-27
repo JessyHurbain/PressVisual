@@ -351,11 +351,30 @@ transition sur `transition_in_ms` (120 ms par défaut), ou sur
 sans délai. Une frappe pendant la disparition rappelle la bulle à sa place,
 sans la laisser à moitié sortie.
 
-La fenêtre de personnalisation rejoue la transition en boucle dans son
-**Aperçu** : la bulle sort puis revient à la cadence choisie, ce qui permet de
-comparer les styles et d'ajuster la durée sans quitter les réglages.
+La fenêtre de personnalisation rejoue la transition dans son **Aperçu** : la
+bulle sort puis revient une fois, à chaque changement de réglage, ce qui permet
+de comparer les styles et d'ajuster la durée sans quitter les réglages.
 
 ![Glissement vers le bas : la bulle sort par le bas sur transition_out_ms](docs/images/transition-slide.png)
+
+### Animations des lignes
+
+Dans l'overlay standard, chaque nouvelle ligne apparaît avec une petite
+animation, choisie avec **Animation des lignes** (clé `row_animation`) :
+
+- **Fondu** (`"fade"`, par défaut) : la ligne devient visible en un peu moins
+de 200 ms, sans déplacer les autres.
+- **Zoom** (`"zoom"`) : les pastilles grossissent depuis leur centre, de 70 % à
+leur taille normale, en apparaissant.
+- **Dérouler** (`"grow"`) : la ligne s'ouvre en hauteur et la bulle grandit pour
+lui faire place, comme un volet.
+- **Aucune** (`"none"`) : la ligne apparaît d'un coup, sans animation.
+
+L'animation ne retarde jamais l'affichage : le contenu est placé immédiatement,
+seules son opacité et sa taille évoluent. Une ligne déjà affichée qui change de
+contenu (texte continu, combinaison en cours, compteur `×2`) se met à jour sans
+animation, pour ne pas clignoter à chaque frappe. Le réglage ne concerne que
+l'overlay standard : le clavier complet allume ses touches sans ligne.
 
 ### Mode clavier complet
 
@@ -450,7 +469,8 @@ l'intérieur plutôt que d'allonger la fenêtre.
   clavier (AZERTY ou QWERTY), **design de la souris** (Classique, Contour ou
   Minimal), case **Afficher la souris à côté du clavier**, case **Afficher les
   clics et la molette près du curseur** (suivi de la souris), son
-  **design des clics près du curseur** (Classique, Contour ou Touche), case
+  **design des clics près du curseur** (Classique, Contour ou Touche),
+  **Animation des lignes** (fondu, zoom, dérouler ou aucune), case
   **Regrouper les appuis répétés de la même touche** (voir plus haut) et
   **Transition de la bulle** (fondu, glissements dans les quatre directions, zoom ou aucune)
   avec sa durée en millisecondes. L'aperçu bascule immédiatement sur le
@@ -590,6 +610,7 @@ Le dossier qui contient le fichier doit donc être accessible en écriture.
   "transition_in_ms": 120,
   "transition": "fade",
   "transition_out_ms": 420,
+  "row_animation": "fade",
   "opacity": 0.86,
   "font_family": "",
   "font_size": 16,
@@ -693,6 +714,7 @@ deux formes cohabitent.
 | `concat_text` | `false` (défaut) : une pastille par touche. `true` : les caractères s'ajoutent dans une ligne de texte. |
 | `typing_join_delay` | Pause (s) qui clôt la ligne de texte en mode `concat_text`. |
 | `count_repeats` | `true` (défaut) : deux appuis de suite sur la même touche affichent `×2` sur une seule pastille. `false` : une pastille par appui. |
+| `row_animation` | Apparition des lignes de l'overlay standard : `fade` (défaut), `zoom`, `grow` (dérouler) ou `none`. |
 | `capture_keyboard` | Afficher les frappes (les raccourcis restent actifs même si `false`). |
 | `capture_mouse` | Afficher les clics et la molette. |
 | `ignore_key_repeats` | Ne pas répéter une touche maintenue enfoncée. |
