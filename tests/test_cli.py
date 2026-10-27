@@ -305,7 +305,9 @@ def test_version_is_printed_without_starting_the_overlay(
     _FakeListener.instances.clear()
     monkeypatch.setattr(cli_module, "InputListener", _FakeListener)
 
-    code = pressvisual.main(["--version"])
+    # --lang fr évite d'installer un traducteur global pour la session : sur un
+    # système anglophone, les tests suivants attendraient des libellés français.
+    code = pressvisual.main(["--lang", "fr", "--version"])
 
     assert code == 0
     printed = capsys.readouterr().out.strip()
@@ -323,7 +325,8 @@ def test_version_answers_even_when_an_instance_is_running(
     first = pressvisual.acquire_instance_lock()
     assert first is not None
     try:
-        code = pressvisual.main(["--version"])
+        # --lang fr : voir test_version_is_printed_without_starting_the_overlay.
+        code = pressvisual.main(["--lang", "fr", "--version"])
     finally:
         first.unlock()
 
@@ -341,7 +344,8 @@ def test_version_without_a_console_opens_a_dialog(qapp, monkeypatch):  # noqa: A
         lambda parent, title, text: shown.append((title, text)),
     )
 
-    code = pressvisual.main(["--version"])
+    # --lang fr : voir test_version_is_printed_without_starting_the_overlay.
+    code = pressvisual.main(["--lang", "fr", "--version"])
 
     assert code == 0
     assert shown == [
