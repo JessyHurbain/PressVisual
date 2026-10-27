@@ -91,8 +91,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--lang",
+        # Les codes sont écrits par argparse entre accolades, juste au-dessus de
+        # cette ligne : inutile de les répéter dans le texte d'aide, où ils
+        # deviendraient faux à chaque langue ajoutée.
         choices=(LANGUAGE_AUTO, *SUPPORTED_LANGUAGES),
-        help=_t("langue de l'interface : auto (système), fr ou en"),
+        help=_t("langue de l'interface (auto = langue du système)"),
     )
     parser.add_argument(
         "--version",

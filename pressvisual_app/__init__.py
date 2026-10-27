@@ -55,6 +55,8 @@ from .cursor import CURSOR_BADGE_MS, DEFAULT_CURSOR_STYLE, CursorBadge
 from .events import InputBridge, KeyEvent, MouseEvent
 from .i18n import (
     LANGUAGE_AUTO,
+    LANGUAGE_FALLBACK,
+    LANGUAGE_LABELS,
     SUPPORTED_LANGUAGES,
     TRANSLATION_CONTEXT,
     _t,
@@ -152,6 +154,8 @@ __all__ = [
     "KeyboardView",
     "KeyRow",
     "LANGUAGE_AUTO",
+    "LANGUAGE_FALLBACK",
+    "LANGUAGE_LABELS",
     "MAX_TEXT_LENGTH",
     "MODIFIER_ALIASES",
     "MODIFIER_KEYS",

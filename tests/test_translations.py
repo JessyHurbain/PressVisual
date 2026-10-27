@@ -72,24 +72,116 @@ def english(qapp):
 # ---------------------------------------------------------------------------
 
 
-def test_catalog_is_complete():
-    _language, messages = compile_translations.parse_ts(TS_PATH)
-    translated = {source for _context, source, _text in messages}
+def catalogue_paths() -> list[Path]:
+    """Catalogues fournis, un par langue (le français est écrit dans le code)."""
+    return sorted(TS_PATH.parent.glob("*.ts"))
 
-    missing = sorted(ui_sources() - translated)
 
-    assert missing == [], f"chaînes sans traduction : {missing}"
+def test_every_catalogue_covers_the_whole_interface():
+    """Chaque langue doit couvrir toutes les chaînes du code.
+
+    La comparaison part des chaînes présentes dans le code : une chaîne neuve
+    fait donc échouer ce test tant qu'elle n'est pas traduite partout, ce qui
+    vaut aussi pour les langues ajoutées plus tard.
+    """
+    expected = ui_sources()
+    for path in catalogue_paths():
+        _language, messages = compile_translations.parse_ts(path)
+        translated = {source for _context, source, _text in messages}
+
+        assert sorted(expected - translated) == [], (
+            f"{path.name} : chaînes sans traduction : "
+            f"{sorted(expected - translated)}"
+        )
+
+
+def test_catalogues_share_the_same_strings():
+    """Toutes les langues couvrent exactement les mêmes chaînes.
+
+    Le code ne dit pas tout : plusieurs libellés sont traduits par table
+    (``_t(TRANSITION_LABELS[value])``), hors de portée de l'analyse du code
+    source. Le catalogue anglais, écrit à la main et complet, sert donc de
+    référence aux autres — une chaîne ajoutée à une seule langue se voit ici.
+    """
+    _language, reference = compile_translations.parse_ts(TS_PATH)
+    expected = {source for _context, source, _text in reference}
+
+    for path in catalogue_paths():
+        _language, messages = compile_translations.parse_ts(path)
+        translated = {source for _context, source, _text in messages}
+
+        assert sorted(expected - translated) == [], (
+            f"{path.name} : chaînes sans traduction : "
+            f"{sorted(expected - translated)}"
+        )
+        assert sorted(translated - expected) == [], (
+            f"{path.name} : chaînes absentes de la référence : "
+            f"{sorted(translated - expected)}"
+        )
 
 
 def test_compiled_catalog_is_up_to_date():
     assert compile_translations.check() == []
 
 
-def test_catalog_declares_english():
-    language, messages = compile_translations.parse_ts(TS_PATH)
+def test_each_catalogue_declares_its_language():
+    for path in catalogue_paths():
+        language, messages = compile_translations.parse_ts(path)
 
-    assert language == "en"
-    assert messages
+        assert messages, f"{path.name} : catalogue vide"
+        assert path.stem == f"pressvisual_{language}", (
+            f"{path.name} : langue déclarée {language!r}"
+        )
+
+
+def test_catalogues_match_the_supported_languages():
+    """Un catalogue par langue annoncée, et rien de plus.
+
+    Le français est la langue source, écrite directement dans le code : son
+    absence de catalogue est normale.
+    """
+    codes = {path.stem.removeprefix("pressvisual_") for path in catalogue_paths()}
+
+    assert codes == set(pressvisual.SUPPORTED_LANGUAGES) - {"fr"}
+
+
+def test_every_supported_language_is_named():
+    """Chaque langue porte son nom, et un seul, dans les réglages."""
+    labels = pressvisual.LANGUAGE_LABELS
+
+    assert set(labels) == set(pressvisual.SUPPORTED_LANGUAGES)
+    assert len(set(labels.values())) == len(labels)
+
+
+def test_catalogues_really_translate():
+    """Un catalogue recopié de la source ne serait pas une traduction.
+
+    Quelques identités sont normales (« Ctrl », « Alt », « Zoom ») ; une part
+    importante de chaînes identiques signalerait un catalogue sans contenu.
+    """
+    for path in catalogue_paths():
+        _language, messages = compile_translations.parse_ts(path)
+        identical = [
+            source for _context, source, text in messages if source == text
+        ]
+
+        assert len(identical) / len(messages) < 0.2, (
+            f"{path.name} : {len(identical)} chaînes recopiées sans traduction"
+        )
+
+
+@pytest.mark.parametrize(
+    "code", [code for code in pressvisual.SUPPORTED_LANGUAGES if code != "fr"]
+)
+def test_installing_a_catalogue_changes_the_interface(qapp, code):
+    """Le catalogue installé doit vraiment changer les textes affichés."""
+    translator = pressvisual.install_translator(qapp, code)
+    assert translator is not None, f"catalogue {code} introuvable"
+    try:
+        assert pressvisual._t("Enregistrer") != "Enregistrer"
+        assert pressvisual._t("Langue") != "Langue"
+    finally:
+        qapp.removeTranslator(translator)
 
 
 def test_qm_is_loadable_by_qt(qapp):
@@ -304,7 +396,7 @@ def test_tray_shows_the_version_whatever_the_language(qapp, overlay, config):
 def test_command_line_help_is_translated(english):
     help_text = pressvisual.build_arg_parser().format_help()
 
-    assert "interface language: auto (system), fr or en" in help_text
+    assert "interface language (auto = system language)" in help_text
     assert "JSON configuration file" in help_text
     assert "print the version and quit" in help_text
 
@@ -332,7 +424,20 @@ def test_explicit_language_is_honoured(value, expected):
 
 @pytest.mark.parametrize(
     ("system_locale", "expected"),
-    [("fr_FR", "fr"), ("fr", "fr"), ("de_DE", "en"), ("en_GB", "en")],
+    [
+        ("fr_FR", "fr"),
+        ("fr", "fr"),
+        ("en_GB", "en"),
+        # La région ne change pas la langue : « pt-BR » reste du portugais.
+        ("de_DE", "de"),
+        ("pt_BR", "pt"),
+        ("zh_CN", "zh"),
+        ("ja_JP", "ja"),
+        ("es_MX", "es"),
+        # Une langue que l'application ne parle pas retombe sur l'anglais.
+        ("pl_PL", "en"),
+        ("sv_SE", "en"),
+    ],
 )
 def test_auto_language_follows_system(monkeypatch, system_locale, expected):
     fake = types.SimpleNamespace(name=lambda: system_locale)
@@ -360,13 +465,14 @@ def test_unknown_language_falls_back_to_system(monkeypatch):
 
 
 def test_config_accepts_supported_languages():
-    for value in ("auto", "fr", "en", "EN"):
+    for value in ("auto", "EN", *pressvisual.SUPPORTED_LANGUAGES):
         config = pressvisual.Config(language=value)
         assert config.validate() == []
 
 
 def test_config_rejects_unknown_language():
-    config = pressvisual.Config(language="de")
+    # « sv » (suédois) n'est pas fourni : la valeur doit être écartée.
+    config = pressvisual.Config(language="sv")
 
     notes = config.validate()
 
@@ -380,8 +486,10 @@ def test_language_cli_option():
     assert parser.parse_args(["--lang", "en"]).lang == "en"
     assert parser.parse_args(["--lang=fr"]).lang == "fr"
     assert parser.parse_args([]).lang is None
+    for code in pressvisual.SUPPORTED_LANGUAGES:
+        assert parser.parse_args(["--lang", code]).lang == code
     with pytest.raises(SystemExit):
-        parser.parse_args(["--lang", "de"])
+        parser.parse_args(["--lang", "sv"])
 
 
 @pytest.mark.parametrize(

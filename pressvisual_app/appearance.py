@@ -56,7 +56,7 @@ from PyQt6.QtWidgets import (
 
 from .config import APPEARANCE_COLOR_FIELDS, Config, _color_to_text
 from .constants import APP_NAME
-from .i18n import LANGUAGE_AUTO, _t
+from .i18n import LANGUAGE_AUTO, LANGUAGE_LABELS, SUPPORTED_LANGUAGES, _t
 from .icon import build_app_icon
 from .keyboard import InputView
 from .keyeditor import KeyShapeEditor
@@ -873,11 +873,11 @@ class AppearanceDialog(QDialog):
         interface_form.setHorizontalSpacing(14)
         interface_form.setVerticalSpacing(8)
         self.language_combo = QComboBox(interface_group)
-        for value, label in (
-            (LANGUAGE_AUTO, _t("Automatique (système)")),
-            ("fr", "Français"),
-            ("en", "English"),
-        ):
+        # Chaque langue est nommée dans la sienne : on cherche « Deutsch » quand
+        # on parle allemand, pas la traduction de « Allemand ».
+        entries = [(LANGUAGE_AUTO, _t("Automatique (système)"))]
+        entries += [(code, LANGUAGE_LABELS[code]) for code in SUPPORTED_LANGUAGES]
+        for value, label in entries:
             self.language_combo.addItem(label, value)
         index = self.language_combo.findData(
             str(config.language).strip().lower()

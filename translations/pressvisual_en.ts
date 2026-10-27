@@ -500,8 +500,8 @@
         <translation>Unknown mouse_style ({value}): “classic” used.</translation>
     </message>
     <message>
-        <source>langue de l'interface : auto (système), fr ou en</source>
-        <translation>interface language: auto (system), fr or en</translation>
+        <source>langue de l'interface (auto = langue du système)</source>
+        <translation>interface language (auto = system language)</translation>
     </message>
     <message>
         <source>langue inconnue ({value}) : « auto » utilisée.</source>

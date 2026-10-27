@@ -15,11 +15,40 @@ if TYPE_CHECKING:
     from .tray import TrayController
 
 #: Langues pour lesquelles un catalogue ``.qm`` est fourni (le français est
-#: la langue source, écrite directement dans le code).
-SUPPORTED_LANGUAGES: tuple[str, ...] = ("fr", "en")
+#: la langue source, écrite directement dans le code). L'ordre est celui du
+#: choix dans les réglages : le français et l'anglais d'abord, puis les autres
+#: par ordre alphabétique de code. Ajouter une langue demande deux choses : son
+#: nom ci-dessous et son catalogue dans translations/ (voir le README).
+SUPPORTED_LANGUAGES: tuple[str, ...] = (
+    "fr",
+    "en",
+    "de",
+    "es",
+    "ja",
+    "pt",
+    "ru",
+    "zh",
+)
+
+#: Nom de chaque langue **dans cette langue**, tel qu'il apparaît dans les
+#: réglages : on cherche « Deutsch » quand on parle allemand, pas « Allemand ».
+#: Ces noms ne se traduisent donc jamais.
+LANGUAGE_LABELS: dict[str, str] = {
+    "fr": "Français",
+    "en": "English",
+    "de": "Deutsch",
+    "es": "Español",
+    "ja": "日本語",
+    "pt": "Português",
+    "ru": "Русский",
+    "zh": "简体中文",
+}
 
 #: Valeur de configuration « suivre la langue du système ».
 LANGUAGE_AUTO = "auto"
+
+#: Langue affichée quand le système en demande une qui n'est pas fournie.
+LANGUAGE_FALLBACK = "en"
 
 #: Contexte utilisé par toutes les chaînes traduisibles.
 TRANSLATION_CONTEXT = "PressVisual"
@@ -44,21 +73,29 @@ def translations_directory() -> Path:
     return Path(__file__).resolve().parents[1] / "translations"
 
 
+def _language_of(locale_name: str) -> Optional[str]:
+    """Code de langue d'une locale, s'il est fourni sous forme de catalogue.
+
+    « pt-BR », « zh_CN » ou « de-AT » désignent la même langue que leur code
+    principal : la région ne change pas les textes de l'interface.
+    """
+    base = locale_name.strip().lower().replace("_", "-").split("-", 1)[0]
+    return base if base in SUPPORTED_LANGUAGES else None
+
+
 def resolve_language(configured: str) -> str:
     """Langue effective : choix explicite, sinon langue du système.
 
-    Une locale inconnue (allemand, espagnol...) retombe sur l'anglais, qui
-    sert de langue de repli aux côtés du français.
+    Une locale que l'application ne parle pas (polonais, suédois...) retombe
+    sur l'anglais, qui sert de langue de repli.
     """
     value = str(configured or LANGUAGE_AUTO).strip().lower().replace("_", "-")
     if value in SUPPORTED_LANGUAGES:
         return value
-    if value.startswith("fr"):
-        return "fr"
-    if value.startswith("en"):
-        return "en"
-    system = QLocale.system().name().lower()
-    return "fr" if system.startswith("fr") else "en"
+    explicit = _language_of(value)
+    if explicit is not None:
+        return explicit
+    return _language_of(QLocale.system().name()) or LANGUAGE_FALLBACK
 
 
 def install_translator(

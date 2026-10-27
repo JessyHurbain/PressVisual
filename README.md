@@ -84,8 +84,9 @@ plan, et n'apparaît que lorsqu'il y a quelque chose à montrer.
   masquage, personnalisation de l'apparence, choix du coin d'ancrage, quitter.
 - **Multi-écrans** : positionnement aux quatre coins (haut/bas, gauche/droite)
   ou en bas au centre, sur l'écran où se trouve le curseur.
-- **Interface bilingue** : français et anglais, suivant la langue du système ou
-  forcée avec `--lang` (ou la clé `language` de `config.json`).
+- **Interface en huit langues** : français, anglais, allemand, espagnol,
+  japonais, portugais, russe et chinois simplifié, suivant la langue du système
+  ou forcée avec `--lang` (ou la clé `language` de `config.json`).
 - **Aucune donnée envoyée sur le réseau**. L'application est entièrement locale.
 
 ## Prérequis
@@ -245,7 +246,7 @@ Les tests couvrent la configuration (chargement, validation, enregistrement),
 l'analyse des raccourcis et des touches, le fil de capture (modificateurs avec
 la souris, molette, double-clic), le rendu de l'overlay (combinaisons, texte
 continu, agrégation de la molette, masquage), la fenêtre d'apparence et les
-traductions (catalogue complet, `.qm` à jour, rendu en anglais).
+traductions (tous les catalogues complets et à jour, rendu dans chaque langue).
 
 Sous Linux sans session graphique, l'import de `pynput` a besoin d'un serveur
 X11 : lancez alors `xvfb-run -a python -m pytest`. C'est ce que fait le workflow
@@ -324,7 +325,7 @@ verrou laissé par un processus qui a planté est récupéré automatiquement.
 | --- | --- |
 | `--version` | Affiche la version et quitte, sans lancer l'overlay. |
 | `--config FICHIER` | Charge un fichier JSON de configuration. |
-| `--lang LANGUE` | Langue de l'interface : `auto` (locale du système), `fr` ou `en`. |
+| `--lang LANGUE` | Langue de l'interface : `auto` (locale du système) ou l'un des codes `fr`, `en`, `de`, `es`, `ja`, `pt`, `ru`, `zh`. |
 | `--duration SEC` | Durée de maintien après la dernière entrée (0,3 à 30 s). |
 | `--opacity VALEUR` | Opacité du fond, de `0.15` à `1.0`. |
 | `--font-size PT` | Taille de police (9 à 40 pt). |
@@ -575,8 +576,9 @@ l'intérieur plutôt que d'allonger la fenêtre.
   avec le bord de l'écran et largeur maximale.
 - **Touches** : forme des touches du clavier et des pastilles, par défaut ou
   touche par touche (voir l'éditeur de touches ci-dessus).
-- **Interface** : langue de l'interface (automatique, français ou anglais).
-  Le changement s'applique dès l'enregistrement, sans redémarrer.
+- **Interface** : langue de l'interface — automatique ou l'une des huit
+  langues, chacune écrite dans la sienne (« Deutsch », pas « Allemand »). Le
+  changement s'applique dès l'enregistrement, sans redémarrer.
 - **Aperçu animé** : la démonstration joue une frappe et un clic (touche
   `A`, puis `Maj + E` avec un clic droit et un cran de molette), dans le mode
   choisi, pour juger du rendu sans rien taper soi-même. La bulle disparaît et
@@ -832,30 +834,56 @@ Les réglages enregistrés par la fenêtre sont : `background_color`,
 
 ## Langues
 
-L'interface existe en **français** et en **anglais**. Le français est la langue
-source, écrite directement dans `pressvisual.py` ; l'anglais est fourni par le
-catalogue `translations/pressvisual_en.qm`.
+L'interface existe en **huit langues**. Le **français** est la langue source,
+écrite directement dans le code ; les sept autres viennent d'un catalogue
+`translations/pressvisual_<code>.qm`.
+
+| Code | Langue | Catalogue |
+| --- | --- | --- |
+| `fr` | Français | langue source, aucun catalogue |
+| `en` | English | [`pressvisual_en`](translations/pressvisual_en.ts) |
+| `de` | Deutsch | [`pressvisual_de`](translations/pressvisual_de.ts) |
+| `es` | Español | [`pressvisual_es`](translations/pressvisual_es.ts) |
+| `ja` | 日本語 | [`pressvisual_ja`](translations/pressvisual_ja.ts) |
+| `pt` | Português | [`pressvisual_pt`](translations/pressvisual_pt.ts) |
+| `ru` | Русский | [`pressvisual_ru`](translations/pressvisual_ru.ts) |
+| `zh` | 简体中文 | [`pressvisual_zh`](translations/pressvisual_zh.ts) |
 
 - `language` dans `config.json`, ou `--lang` en ligne de commande, accepte
-  `auto`, `fr` et `en`. `--lang` est prioritaire sur le fichier.
-- `auto` (défaut) suit la locale du système : français si elle commence par
-  `fr`, anglais sinon.
-- La langue se choisit aussi dans **Personnaliser l'overlay… → Interface** ;
-  le changement s'applique dès l'enregistrement, sans redémarrage.
+  `auto` ou l'un de ces codes. `--lang` est prioritaire sur le fichier.
+- `auto` (défaut) suit la locale du système en ne retenant que sa langue : une
+  locale `pt-BR`, `zh_CN` ou `de-AT` donne `pt`, `zh` ou `de`. Une langue que
+  l'application ne parle pas (polonais, suédois…) retombe sur l'anglais.
+- La langue se choisit aussi dans **Personnaliser l'overlay… → Interface**, où
+  chaque langue est écrite dans la sienne ; le changement s'applique dès
+  l'enregistrement, sans redémarrage.
 - Les libellés de `config.json` restent ceux que vous y avez écrits ; leurs
   valeurs par défaut sont traduites à l'affichage.
 
 ```bash
-python pressvisual.py --lang en
+python pressvisual.py --lang ja
 ```
 
-Pour corriger ou compléter une traduction, modifiez
-[`translations/pressvisual_en.ts`](translations/pressvisual_en.ts) puis
-régénérez le `.qm` :
+Pour corriger une traduction, modifiez le `.ts` correspondant puis régénérez
+tous les `.qm` — la commande vérifie au passage que chacun correspond encore à
+son `.ts` :
 
 ```bash
 python tools/compile_translations.py --verify
 ```
+
+### Ajouter une langue
+
+1. Copier un catalogue existant en `translations/pressvisual_<code>.ts`, y
+   remplacer l'attribut `language` et les traductions.
+2. Ajouter le code à `SUPPORTED_LANGUAGES` et son nom à `LANGUAGE_LABELS` dans
+   [pressvisual_app/i18n.py](pressvisual_app/i18n.py) ; le nom s'écrit dans la
+   langue concernée, il ne se traduit jamais.
+3. Compiler : `python tools/compile_translations.py --verify`.
+
+La suite de tests refuse une langue annoncée sans catalogue, un catalogue
+incomplet — une chaîne neuve dans le code fait échouer les tests tant qu'elle
+n'est pas traduite partout — et un `.qm` qui ne correspond plus à son `.ts`.
 
 `lrelease` n'est pas nécessaire : le script écrit directement le format
 binaire de Qt, et `--verify` recharge le résultat avec `QTranslator`. Un test
@@ -1103,7 +1131,7 @@ git push origin v1.0.0
   dernier coin choisi. Le bundle macOS fait exception : ses réglages vont dans
   `~/Library/Application Support/PressVisual/`, un `.app` installé dans
   `/Applications` n'étant pas inscriptible.
-- Le dossier `translations/` doit être embarqué pour l'interface anglaise :
+- Le dossier `translations/` doit être embarqué pour les langues traduites :
   ajoutez `--add-data "translations:translations"` (Windows :
   `--add-data "translations;translations"`). Sans lui, l'application reste en
   français.

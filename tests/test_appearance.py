@@ -619,10 +619,25 @@ def test_dialog_exposes_language_choice(qapp, config):
     dialog = make_dialog(qapp, config)
     try:
         combo = dialog.language_combo
-        assert combo.count() == 3
+        # « Automatique » puis une entrée par langue fournie.
+        assert combo.count() == 1 + len(pressvisual.SUPPORTED_LANGUAGES)
         assert combo.currentData() == "auto"
-        assert combo.findData("fr") >= 0
-        assert combo.findData("en") >= 0
+        for code in pressvisual.SUPPORTED_LANGUAGES:
+            assert combo.findData(code) >= 0
+    finally:
+        dialog.deleteLater()
+
+
+def test_language_names_are_written_in_their_own_language(qapp, config):
+    """On cherche « Deutsch » quand on parle allemand, pas « Allemand »."""
+    dialog = make_dialog(qapp, config)
+    try:
+        combo = dialog.language_combo
+        labels = [combo.itemText(index) for index in range(combo.count())]
+
+        assert labels[0] == "Automatique (système)"  # la partie traduite
+        for index, code in enumerate(pressvisual.SUPPORTED_LANGUAGES, start=1):
+            assert labels[index] == pressvisual.LANGUAGE_LABELS[code]
     finally:
         dialog.deleteLater()
 
