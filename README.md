@@ -1049,6 +1049,23 @@ git push origin v1.0.0
 
 ## Dépannage
 
+**Où lire les messages**
+Les avertissements de PressVisual — configuration illisible, capture refusée,
+raccourci global invalide — sont écrits sur la sortie d'erreur **et** dans un
+journal, à côté des données de l'application :
+
+| Système | Journal |
+|---|---|
+| Linux | `~/.local/share/PressVisual/pressvisual.log` |
+| Windows | `%LOCALAPPDATA%\PressVisual\pressvisual.log` |
+| macOS | `~/Library/Application Support/PressVisual/pressvisual.log` |
+
+C'est le seul moyen de les lire avec l'AppImage lancée depuis le menu, le `.exe`
+Windows ou le `.app` macOS : ces trois-là n'ont pas de console, et le message
+serait perdu. Joignez ce fichier à un rapport de problème — il commence chaque
+ligne par la date et l'heure. Au-delà de 256 Kio, le journal précédent est
+conservé à côté sous `pressvisual.log.1`.
+
 **Aucune bulle n'apparaît**
 Vérifiez que l'icône est présente dans la zone de notification, appuyez sur
 `Ctrl + F12`, puis tapez du texte. Vérifiez aussi `capture_keyboard`,
@@ -1116,6 +1133,7 @@ pressvisual_app/      Code de l'application
   icon.py             Icône de l'application
   tray.py             Icône de notification et menu
   cli.py              Ligne de commande et démarrage
+  diagnostics.py      Messages d'erreur et journal (exécutables sans console)
 translations/         Catalogues de traduction (.ts source, .qm compilé)
 tools/                Compilation des .ts en .qm, builds, captures du README
 tests/                Suite de tests hors écran (pytest)

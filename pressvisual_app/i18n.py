@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Optional
 from PyQt6.QtCore import QCoreApplication, QLocale, QTranslator
 from PyQt6.QtWidgets import QApplication
 
-from .constants import APP_NAME
+from . import diagnostics
 
 if TYPE_CHECKING:
     from .tray import TrayController
@@ -77,10 +77,8 @@ def install_translator(
     translator = QTranslator(app)
     path = translations_directory() / f"pressvisual_{language}.qm"
     if not translator.load(str(path)):
-        sys.stderr.write(
-            f"[{APP_NAME}] "
-            + _t("Traduction introuvable ou illisible : {path}").format(path=path)
-            + "\n"
+        diagnostics.warn(
+            _t("Traduction introuvable ou illisible : {path}").format(path=path)
         )
         return None
     app.installTranslator(translator)

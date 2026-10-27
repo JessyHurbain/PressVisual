@@ -23,6 +23,17 @@ import pytest  # noqa: E402 - après le réglage de QT_QPA_PLATFORM
 from PyQt6.QtWidgets import QApplication  # noqa: E402
 
 import pressvisual  # noqa: E402 - dépend du réglage ci-dessus
+from pressvisual_app import diagnostics  # noqa: E402 - idem
+
+
+@pytest.fixture(autouse=True)
+def _journal_temporaire(tmp_path, monkeypatch):
+    """Détourne le journal vers un dossier temporaire.
+
+    Sans cela, chaque test qui signale un message écrirait dans le dossier de
+    données du vrai utilisateur.
+    """
+    monkeypatch.setattr(diagnostics, "_log_path", tmp_path / "pressvisual.log")
 
 
 @pytest.fixture(scope="session")

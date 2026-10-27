@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import pytest
+from PyQt6.QtWidgets import QApplication
 
 import pressvisual
 from pressvisual_app import cli as cli_module
+from pressvisual_app import diagnostics
 
 
 def test_defaults_are_all_optional():
@@ -229,6 +231,72 @@ def test_frozen_macos_bundle_stores_config_in_application_support(
     expected = home / "Library" / "Application Support" / "PressVisual"
     assert path == expected / "config.json"
     assert path.parent.is_dir()
+
+
+class _FakeListener:
+    """Écouteur factice : un test ne touche pas au clavier de la machine."""
+
+    instances: list["_FakeListener"] = []
+
+    def __init__(self, bridge, config, hotkeys):
+        self.started = False
+        self.stopped = False
+        self.instances.append(self)
+
+    def start(self) -> None:
+        self.started = True
+
+    def stop(self) -> None:
+        self.stopped = True
+
+
+def test_main_starts_without_standard_streams(
+    qapp, tmp_path, monkeypatch  # noqa: ARG001 - QApplication requise
+):
+    """Exécutable fenêtré : PyInstaller laisse ``sys.stderr`` à ``None``.
+
+    Un message de configuration faisait alors mourir l'application
+    (``AttributeError: 'NoneType' object has no attribute 'write'``) avant même
+    qu'elle n'affiche l'overlay, et l'utilisateur ne voyait rien du tout.
+    """
+    log = tmp_path / "pressvisual.log"
+    diagnostics.set_log_path(log)
+    unreadable = tmp_path / "config.json"
+    unreadable.write_text("{ ceci n'est pas du JSON", encoding="utf-8")
+    _FakeListener.instances.clear()
+
+    monkeypatch.setattr(
+        cli_module, "_instance_lock_path", lambda: tmp_path / "pv.lock"
+    )
+    monkeypatch.setattr(cli_module, "InputListener", _FakeListener)
+    monkeypatch.setattr(QApplication, "exec", lambda self: 0)
+    monkeypatch.setattr(cli_module.sys, "stderr", None)
+
+    try:
+        # --lang fr évite d'installer un traducteur global pour la session ; le
+        # raccourci invalide ajoute un message de plus au journal.
+        code = pressvisual.main(
+            [
+                "--lang",
+                "fr",
+                "--config",
+                str(unreadable),
+                "--toggle-hotkey",
+                "ctrl+",
+            ]
+        )
+    finally:
+        # main() branche l'arrêt sur le signal de l'application de la session :
+        # sans ce retrait, il se déclencherait plus tard sur des objets détruits.
+        qapp.aboutToQuit.disconnect()
+
+    assert code == 0
+    written = log.read_text(encoding="utf-8")
+    assert "Configuration illisible" in written
+    assert "Raccourci global invalide ignoré" in written
+    assert len(_FakeListener.instances) == 1
+    assert _FakeListener.instances[0].started is True
+    assert _FakeListener.instances[0].stopped is True
 
 
 def test_frozen_windows_executable_keeps_config_beside_it(monkeypatch, tmp_path):

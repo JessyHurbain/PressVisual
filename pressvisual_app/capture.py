@@ -8,14 +8,16 @@ import threading
 import time
 from typing import TYPE_CHECKING, Optional
 
+from . import diagnostics
+
 try:
     from pynput import keyboard, mouse
 except Exception as exc:  # pragma: no cover - dépend de l'environnement
-    sys.stderr.write(
+    diagnostics.warn(
         "Impossible de démarrer PressVisual : la bibliothèque pynput est indisponible.\n"
         "Sur Linux, installez aussi les dépendances X11 (python3-xlib).\n"
         "    python -m pip install -r requirements.txt\n"
-        f"Détail : {exc}\n"
+        f"Détail : {exc}"
     )
     raise SystemExit(1) from exc
 

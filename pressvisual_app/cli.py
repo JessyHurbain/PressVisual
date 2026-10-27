@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 from .capture import InputListener
 from .config import Config
 from .constants import APP_NAME
+from .diagnostics import warn
 from .events import InputBridge
 from .i18n import (
     LANGUAGE_AUTO,
@@ -242,9 +243,6 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(arguments)
 
-    def warn(message: str) -> None:
-        sys.stderr.write(f"[{APP_NAME}] {message}\n")
-
     # Une seule instance peut écouter le clavier à la fois.
     instance_lock = acquire_instance_lock()
     if instance_lock is None:
@@ -252,10 +250,10 @@ def main(argv: Optional[list[str]] = None) -> int:
             "PressVisual est déjà lancé : une seule instance peut capturer "
             "le clavier."
         )
-        if sys.stderr is not None:
-            warn(message)
-        else:
-            # Exécutable sans console : le message doit rester visible.
+        warn(message)
+        if sys.stderr is None:
+            # Exécutable sans console : le message doit rester visible, en plus
+            # du journal.
             QMessageBox.information(None, APP_NAME, message)
         return 1
 

@@ -5,14 +5,13 @@ from __future__ import annotations
 import contextlib
 import json
 import os
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
 from PyQt6.QtGui import QColor
 
-from .constants import APP_NAME
+from . import diagnostics
 from .i18n import LANGUAGE_AUTO, SUPPORTED_LANGUAGES, _t
 from .keymap import (
     CURSOR_STYLES,
@@ -492,22 +491,18 @@ class Config:
             try:
                 raw = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, ValueError) as exc:
-                sys.stderr.write(
-                    f"[{APP_NAME}] "
-                    + _t("{what} non enregistrée ({path}) : {exc}").format(
+                diagnostics.warn(
+                    _t("{what} non enregistrée ({path}) : {exc}").format(
                         what=what, path=path, exc=exc
                     )
-                    + "\n"
                 )
                 return False
             if not isinstance(raw, dict):
-                sys.stderr.write(
-                    f"[{APP_NAME}] "
-                    + _t(
+                diagnostics.warn(
+                    _t(
                         "{what} non enregistrée ({path}) : "
                         "un objet JSON est attendu."
                     ).format(what=what, path=path)
-                    + "\n"
                 )
                 return False
             # Le renommage des clés se fait ici : le fichier est débarrassé
@@ -541,12 +536,10 @@ class Config:
             )
             os.replace(temp_path, path)
         except OSError as exc:
-            sys.stderr.write(
-                f"[{APP_NAME}] "
-                + _t("{what} non enregistrée ({path}) : {exc}").format(
+            diagnostics.warn(
+                _t("{what} non enregistrée ({path}) : {exc}").format(
                     what=what, path=path, exc=exc
                 )
-                + "\n"
             )
             # Le fichier temporaire n'existe pas toujours : son nettoyage ne
             # doit pas masquer l'erreur d'écriture déjà signalée.
