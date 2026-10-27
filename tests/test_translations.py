@@ -279,11 +279,34 @@ def test_language_change_updates_the_menu(qapp, overlay, config):
         tray.deleteLater()
 
 
+def test_tray_shows_the_version_whatever_the_language(qapp, overlay, config):
+    """La version ne se traduit pas : elle doit être identique dans les deux."""
+    tray = pressvisual.TrayController(qapp, overlay, config)
+    translator = None
+    expected = f"{pressvisual.APP_NAME} {pressvisual.APP_VERSION}"
+    try:
+        assert tray.menu.actions()[0] is tray.act_version
+        assert tray.act_version.text() == expected
+        assert tray.act_version.isEnabled() is False
+        assert tray.tray.toolTip().startswith(expected + "\n")
+
+        translator = pressvisual.apply_language_change(qapp, tray, translator, "en")
+
+        assert tray.act_version.text() == expected
+        assert tray.tray.toolTip().startswith(expected + "\n")
+    finally:
+        if translator is not None:
+            qapp.removeTranslator(translator)
+        tray.tray.hide()
+        tray.deleteLater()
+
+
 def test_command_line_help_is_translated(english):
     help_text = pressvisual.build_arg_parser().format_help()
 
     assert "interface language: auto (system), fr or en" in help_text
     assert "JSON configuration file" in help_text
+    assert "print the version and quit" in help_text
 
 
 # ---------------------------------------------------------------------------

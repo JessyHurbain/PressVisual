@@ -299,6 +299,56 @@ def test_main_starts_without_standard_streams(
     assert _FakeListener.instances[0].stopped is True
 
 
+def test_version_is_printed_without_starting_the_overlay(
+    qapp, capsys, monkeypatch  # noqa: ARG001 - QApplication requise
+):
+    _FakeListener.instances.clear()
+    monkeypatch.setattr(cli_module, "InputListener", _FakeListener)
+
+    code = pressvisual.main(["--version"])
+
+    assert code == 0
+    printed = capsys.readouterr().out.strip()
+    assert printed == f"{pressvisual.APP_NAME} {pressvisual.APP_VERSION}"
+    # Aucun écouteur : la version se lit sans lancer la capture.
+    assert _FakeListener.instances == []
+
+
+def test_version_answers_even_when_an_instance_is_running(
+    qapp, tmp_path, monkeypatch, capsys  # noqa: ARG001 - QApplication requise
+):
+    monkeypatch.setattr(
+        cli_module, "_instance_lock_path", lambda: tmp_path / "pv.lock"
+    )
+    first = pressvisual.acquire_instance_lock()
+    assert first is not None
+    try:
+        code = pressvisual.main(["--version"])
+    finally:
+        first.unlock()
+
+    assert code == 0
+    assert pressvisual.APP_VERSION in capsys.readouterr().out
+
+
+def test_version_without_a_console_opens_a_dialog(qapp, monkeypatch):  # noqa: ARG001
+    """Exécutable fenêtré : la boîte de dialogue remplace la sortie standard."""
+    shown: list[tuple] = []
+    monkeypatch.setattr(cli_module.sys, "stdout", None)
+    monkeypatch.setattr(
+        cli_module.QMessageBox,
+        "information",
+        lambda parent, title, text: shown.append((title, text)),
+    )
+
+    code = pressvisual.main(["--version"])
+
+    assert code == 0
+    assert shown == [
+        (pressvisual.APP_NAME, f"{pressvisual.APP_NAME} {pressvisual.APP_VERSION}")
+    ]
+
+
 def test_frozen_windows_executable_keeps_config_beside_it(monkeypatch, tmp_path):
     executable = tmp_path / "PressVisual.exe"
     executable.write_text("")

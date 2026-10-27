@@ -9,7 +9,7 @@ from PyQt6.QtGui import QAction, QActionGroup
 from PyQt6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from .config import Config
-from .constants import APP_NAME
+from .constants import APP_NAME, APP_VERSION
 from .i18n import _t
 from .icon import build_app_icon
 from .keymap import POSITION_CHOICES, POSITION_LABELS, describe_hotkey
@@ -33,6 +33,14 @@ class TrayController(QObject):
         self.tray = QSystemTrayIcon(build_app_icon(), self)
         self.tray.setToolTip(self._tooltip())
         self.menu = QMenu()
+
+        # En tête du menu : la version de l'application. Désactivée, elle n'est
+        # qu'une étiquette, mais c'est le repère qu'on demande en premier dans
+        # un rapport de problème. Son texte ne se traduit pas.
+        self.act_version = QAction(f"{APP_NAME} {APP_VERSION}", self)
+        self.act_version.setEnabled(False)
+        self.menu.addAction(self.act_version)
+        self.menu.addSeparator()
 
         self.act_visible = QAction("", self)
         self.act_visible.setCheckable(True)
@@ -133,7 +141,7 @@ class TrayController(QObject):
                         label=label, shortcut=description
                     )
                 )
-        return f"{APP_NAME}\n" + "\n".join(hints)
+        return f"{APP_NAME} {APP_VERSION}\n" + "\n".join(hints)
 
     def sync_actions(self) -> None:
         self.act_visible.setChecked(self._overlay.capture_enabled)

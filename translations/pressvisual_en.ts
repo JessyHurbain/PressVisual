@@ -440,6 +440,10 @@
         <translation>Win</translation>
     </message>
     <message>
+        <source>afficher la version et quitter</source>
+        <translation>print the version and quit</translation>
+    </message>
+    <message>
         <source>clavier : {error}</source>
         <translation>keyboard: {error}</translation>
     </message>

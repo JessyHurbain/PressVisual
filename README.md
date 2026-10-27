@@ -252,7 +252,10 @@ python -m pressvisual_app
 ```
 
 L'overlay reste invisible tant que vous ne tapez pas et ne cliquez pas.
-L'icône PressVisual apparaît dans la zone de notification.
+L'icône PressVisual apparaît dans la zone de notification ; son menu s'ouvre sur
+la version installée (`PressVisual 0.1.5`), également affichée en tête de
+l'info-bulle et par `--version` — c'est le premier renseignement à joindre à un
+rapport de problème.
 
 **Une seule instance à la fois.** Si PressVisual tourne déjà, un nouveau
 lancement affiche « PressVisual est déjà lancé : une seule instance peut
@@ -268,6 +271,7 @@ verrou laissé par un processus qui a planté est récupéré automatiquement.
 
 | Option | Description |
 | --- | --- |
+| `--version` | Affiche la version et quitte, sans lancer l'overlay. |
 | `--config FICHIER` | Charge un fichier JSON de configuration. |
 | `--lang LANGUE` | Langue de l'interface : `auto` (locale du système), `fr` ou `en`. |
 | `--duration SEC` | Durée de maintien après la dernière entrée (0,3 à 30 s). |
@@ -1005,6 +1009,12 @@ C'est ce message qui s'affiche, et non un « Full Changelog » vide —
 `--generate-notes` ne remplit rien tant que le projet n'utilise pas de pull
 requests. Un tag léger (créé sans `-a`) n'a pas de message : le workflow
 détecte le type du tag et retombe alors sur les notes générées.
+
+Le numéro affiché par `--version`, dans le menu de la notification et en tête de
+l'info-bulle vient de `APP_VERSION`, dans
+[`pressvisual_app/constants.py`](pressvisual_app/constants.py) : c'est la seule
+source de vérité, et elle doit être mise à jour **avant** de pousser le tag,
+sans quoi l'application annonce une version plus ancienne que le binaire publié.
 
 Si l'une des trois constructions échoue, aucune release n'est créée : c'est
 volontaire, une version à moitié publiée serait pire que pas de version.

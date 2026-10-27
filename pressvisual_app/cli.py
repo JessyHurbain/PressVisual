@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
 from .capture import InputListener
 from .config import Config
-from .constants import APP_NAME
+from .constants import APP_NAME, APP_VERSION
 from .diagnostics import warn
 from .events import InputBridge
 from .i18n import (
@@ -93,6 +93,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--lang",
         choices=(LANGUAGE_AUTO, *SUPPORTED_LANGUAGES),
         help=_t("langue de l'interface : auto (système), fr ou en"),
+    )
+    parser.add_argument(
+        "--version",
+        action="store_true",
+        help=_t("afficher la version et quitter"),
     )
     parser.add_argument(
         "--duration",
@@ -195,6 +200,22 @@ def apply_arguments(config: Config, args: argparse.Namespace) -> None:
         config.language = args.lang
 
 
+def show_version() -> int:
+    """Affiche la version de l'application.
+
+    Sans console — le ``.exe`` Windows et le bundle macOS fenêtrés n'ont ni
+    ``stdout`` ni ``stderr`` — une boîte de dialogue est le seul moyen de lire
+    la version demandée.
+    """
+    message = f"{APP_NAME} {APP_VERSION}"
+    if sys.stdout is None:
+        QMessageBox.information(None, APP_NAME, message)
+        return 0
+    with contextlib.suppress(OSError, ValueError):
+        sys.stdout.write(message + "\n")
+    return 0
+
+
 def _instance_lock_path() -> Path:
     """Fichier de verrou empêchant deux instances de capturer le clavier."""
     base = QStandardPaths.writableLocation(
@@ -242,6 +263,12 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     parser = build_arg_parser()
     args = parser.parse_args(arguments)
+
+    # Comme --help, --version répond sans toucher à la configuration et sans se
+    # soucier d'une instance déjà lancée : c'est la question qu'on pose quand
+    # quelque chose ne va pas.
+    if args.version:
+        return show_version()
 
     # Une seule instance peut écouter le clavier à la fois.
     instance_lock = acquire_instance_lock()

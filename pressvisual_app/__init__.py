@@ -39,6 +39,7 @@ from .cli import (
     apply_arguments,
     build_arg_parser,
     main,
+    show_version,
 )
 from .config import (
     APPEARANCE_COLOR_FIELDS,
@@ -49,7 +50,7 @@ from .config import (
     _as_bool,
     _color_to_text,
 )
-from .constants import APP_NAME
+from .constants import APP_NAME, APP_VERSION
 from .cursor import CURSOR_BADGE_MS, DEFAULT_CURSOR_STYLE, CursorBadge
 from .events import InputBridge, KeyEvent, MouseEvent
 from .i18n import (
@@ -117,6 +118,7 @@ from .widgets import Badge, KeyRow
 
 __all__ = [
     "APP_NAME",
+    "APP_VERSION",
     "APPEARANCE_COLOR_FIELDS",
     "APPEARANCE_CONFIG_KEYS",
     "AZERTY",
@@ -205,5 +207,6 @@ __all__ = [
     "parse_hotkey",
     "resolve_language",
     "should_use_combo",
+    "show_version",
     "translations_directory",
 ]
