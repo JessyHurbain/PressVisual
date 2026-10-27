@@ -222,6 +222,12 @@ branche qui n'est pas extraite, ou des modifications en cours dans votre arbre
 de travail, ne faussent donc pas le résultat : c'est bien la révision annoncée
 par Git qui passe les tests.
 
+Pour une poussée de plusieurs commits, il affiche ce qui part : la pointe
+testée de chaque référence, puis les révisions antérieures qu'elle contient et
+qui ne sont **pas** testées séparément. Leurs changements sont bien dans la
+pointe vérifiée, mais rien ne dit que chacune passait les tests à son époque —
+c'est déjà ce que fait la CI, qui ne teste que le commit poussé.
+
 ```bash
 git config --local core.hooksPath tools/git-hooks
 ```
