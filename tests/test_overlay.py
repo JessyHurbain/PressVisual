@@ -384,6 +384,40 @@ def test_cursor_badge_paints_its_label(qapp, overlay, config):
         badge.hide_badge()
 
 
+def test_cursor_badge_uses_the_configured_style(qapp, overlay, config):
+    config.cursor_style = "keycap"
+    badge = overlay._cursor_indicator()
+    try:
+        assert badge.style == "keycap"
+        badge.show_label("Ctrl + Clic gauche")
+        qapp.processEvents()
+
+        assert badge.isVisible()
+        assert not badge.grab().isNull()
+    finally:
+        badge.hide_badge()
+
+
+def test_cursor_badge_follows_the_chosen_style(overlay, config):
+    badge = overlay._cursor_indicator()
+    try:
+        overlay.apply_appearance({"cursor_style": "outline"})
+
+        assert config.cursor_style == "outline"
+        assert badge.style == "outline"
+    finally:
+        badge.hide_badge()
+
+
+def test_cursor_badge_ignores_an_unknown_style(overlay, config):
+    config.cursor_style = "neon"
+    badge = overlay._cursor_indicator()
+    try:
+        assert badge.style == "classic"
+    finally:
+        badge.hide_badge()
+
+
 def test_mouse_tracking_off_keeps_the_bubble_rows(overlay):
     overlay._on_mouse(MouseEvent(kind="click", button="left"))
 

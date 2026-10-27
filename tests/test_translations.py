@@ -193,6 +193,17 @@ def test_display_settings_are_translated(english, qapp, config):
             "Zoom",
             "None",
         ]
+        styles = [
+            dialog.mouse_style_combo.itemText(index)
+            for index in range(dialog.mouse_style_combo.count())
+        ]
+
+        assert styles == ["Classic", "Outline", "Minimal"]
+        cursor_styles = [
+            dialog.cursor_style_combo.itemText(index)
+            for index in range(dialog.cursor_style_combo.count())
+        ]
+        assert cursor_styles == ["Classic", "Outline", "Key"]
         assert dialog.show_mouse.text() == "Show the mouse next to the keyboard"
         assert dialog.mouse_tracking.text() == (
             "Show clicks and scroll wheel movements next to the cursor"

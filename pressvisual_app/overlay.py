@@ -248,6 +248,7 @@ class Overlay(QWidget):
         self._palette.update_from_config(self._cfg)
         if self._cursor_badge is not None:
             self._cursor_badge.set_palette(self._palette)
+            self._cursor_badge.set_style(self._cfg.cursor_style)
             self._cursor_badge.set_font(self._badge_font)
             if not self._cfg.mouse_tracking:
                 self._cursor_badge.hide_badge()
@@ -1272,7 +1273,9 @@ class Overlay(QWidget):
     def _cursor_indicator(self) -> CursorBadge:
         """Pastille du curseur, créée au premier clic affiché."""
         if self._cursor_badge is None:
-            self._cursor_badge = CursorBadge(self._palette, self._badge_font)
+            self._cursor_badge = CursorBadge(
+                self._palette, self._badge_font, self._cfg.cursor_style
+            )
         return self._cursor_badge
 
     def _show_cursor_event(self, event: MouseEvent) -> None:

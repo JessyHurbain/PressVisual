@@ -484,6 +484,10 @@
         <translation>Unknown keyboard_layout ({value}): “azerty” used.</translation>
     </message>
     <message>
+        <source>mouse_style inconnu ({value}) : « classic » utilisé.</source>
+        <translation>Unknown mouse_style ({value}): “classic” used.</translation>
+    </message>
+    <message>
         <source>langue de l'interface : auto (système), fr ou en</source>
         <translation>interface language: auto (system), fr or en</translation>
     </message>
@@ -602,6 +606,34 @@
     <message>
         <source>{what} non enregistrée ({path}) : {exc}</source>
         <translation>Could not save {what} ({path}): {exc}</translation>
+    </message>
+    <message>
+        <source>Classique</source>
+        <translation>Classic</translation>
+    </message>
+    <message>
+        <source>Contour</source>
+        <translation>Outline</translation>
+    </message>
+    <message>
+        <source>Design de la souris</source>
+        <translation>Mouse design</translation>
+    </message>
+    <message>
+        <source>Minimal</source>
+        <translation>Minimal</translation>
+    </message>
+    <message>
+        <source>cursor_style inconnu ({value}) : « classic » utilisé.</source>
+        <translation>Unknown cursor_style ({value}): using "classic".</translation>
+    </message>
+    <message>
+        <source>Design des clics près du curseur</source>
+        <translation>Click indicator design</translation>
+    </message>
+    <message>
+        <source>Touche</source>
+        <translation>Key</translation>
     </message>
     <message>
         <source>Échap</source>

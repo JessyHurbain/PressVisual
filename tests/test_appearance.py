@@ -357,6 +357,52 @@ def test_dialog_exposes_mouse_tracking(qapp, config):
         dialog.deleteLater()
 
 
+def test_dialog_exposes_mouse_styles(qapp, config):
+    dialog = make_dialog(qapp, config)
+    try:
+        choices = [
+            dialog.mouse_style_combo.itemData(index)
+            for index in range(dialog.mouse_style_combo.count())
+        ]
+
+        assert choices == ["classic", "outline", "minimal"]
+        assert dialog.mouse_style_combo.currentData() == "classic"
+
+        dialog.mouse_style_combo.setCurrentIndex(
+            dialog.mouse_style_combo.findData("outline")
+        )
+        assert dialog.values()["mouse_style"] == "outline"
+
+        dialog._reset()
+        assert dialog.mouse_style_combo.currentData() == "classic"
+    finally:
+        dialog.deleteLater()
+
+
+def test_dialog_exposes_cursor_styles(qapp, config):
+    config.cursor_style = "outline"
+    dialog = make_dialog(qapp, config)
+    try:
+        choices = [
+            dialog.cursor_style_combo.itemData(index)
+            for index in range(dialog.cursor_style_combo.count())
+        ]
+
+        assert choices == ["classic", "outline", "keycap"]
+        assert dialog.cursor_style_combo.currentData() == "outline"
+        assert dialog.values()["cursor_style"] == "outline"
+
+        dialog.cursor_style_combo.setCurrentIndex(
+            dialog.cursor_style_combo.findData("keycap")
+        )
+        assert dialog.values()["cursor_style"] == "keycap"
+
+        dialog._reset()
+        assert dialog.cursor_style_combo.currentData() == "classic"
+    finally:
+        dialog.deleteLater()
+
+
 def test_dialog_exposes_language_choice(qapp, config):
     dialog = make_dialog(qapp, config)
     try:

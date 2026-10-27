@@ -32,6 +32,24 @@ DISPLAY_MODES: tuple[str, ...] = ("overlay", "keyboard")
 #: Dispositions de clavier proposées pour le mode « clavier complet ».
 KEYBOARD_LAYOUTS: tuple[str, ...] = ("azerty", "qwerty")
 
+#: Dessins proposés pour la souris du mode clavier.
+MOUSE_STYLES: tuple[str, ...] = ("classic", "outline", "minimal")
+
+MOUSE_STYLE_LABELS: dict[str, str] = {
+    "classic": "Classique",
+    "outline": "Contour",
+    "minimal": "Minimal",
+}
+
+#: Dessins de la pastille affichée près du curseur (clic et molette).
+CURSOR_STYLES: tuple[str, ...] = ("classic", "outline", "keycap")
+
+CURSOR_STYLE_LABELS: dict[str, str] = {
+    "classic": "Classique",
+    "outline": "Contour",
+    "keycap": "Touche",
+}
+
 #: Transitions de la bulle, utilisées à l'apparition comme à la disparition.
 TRANSITIONS: tuple[str, ...] = (
     "fade",

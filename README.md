@@ -369,6 +369,10 @@ réagissent, ce qui met le geste en avant pour une démonstration ou un tutoriel
   sens du défilement (haut, bas, gauche, droite) pendant un court instant,
   puisqu'un cran n'a pas de relâchement. Avec `"capture_mouse": false`, la
   souris n'est pas dessinée.
+- Trois dessins de souris, réglables dans la fenêtre de personnalisation ou
+  avec `mouse_style` : **Classique** (fond plein, boutons séparés), **Contour**
+  (traits seuls, sans fond) et **Minimal** (silhouette où seuls les gestes
+  apparaissent ; la molette reste dessinée au repos).
 - La souris se masque sans changer de mode : décochez **Afficher la souris à
   côté du clavier** dans la fenêtre de personnalisation, ou mettez
   `"show_mouse": false`. Le clavier reste alors seul dans la bulle.
@@ -398,11 +402,13 @@ fenêtre de réglages avec un aperçu en direct :
 - **Mise en forme** : police, taille, opacité du fond, rayon des coins, marge
   avec le bord de l'écran et largeur maximale.
 - **Affichage** : mode (overlay standard ou clavier complet), disposition du
-  clavier (AZERTY ou QWERTY), case **Afficher la souris à côté du clavier**,
-  case **Afficher les clics et la molette près du curseur** (suivi de la
-  souris) et **Transition de la bulle** (fondu, glissements dans les quatre
-  directions, zoom ou aucune) avec sa durée en millisecondes. L'aperçu
-  bascule immédiatement sur le clavier, avec ou sans sa souris.
+  clavier (AZERTY ou QWERTY), **design de la souris** (Classique, Contour ou
+  Minimal), case **Afficher la souris à côté du clavier**, case **Afficher les
+  clics et la molette près du curseur** (suivi de la souris) avec son
+  **design des clics près du curseur** (Classique, Contour ou Touche) et
+  **Transition de la bulle** (fondu, glissements dans les quatre directions, zoom ou aucune)
+  avec sa durée en millisecondes. L'aperçu bascule immédiatement sur le
+  clavier, avec ou sans sa souris.
 - **Interface** : langue de l'interface (automatique, français ou anglais).
   Le changement s'applique dès l'enregistrement, sans redémarrer.
 - **Aperçu animé** : la démonstration rejoue en boucle une frappe et un clic
@@ -426,12 +432,22 @@ La case **Afficher les clics et la molette près du curseur** (clé
 `mouse_tracking`) affiche une petite pastille à côté du pointeur à chaque clic
 et chaque cran de molette, modificateurs compris (`Ctrl + Clic gauche`,
 `Maj + Scroll ←`). Elle s'efface seule après 0,7 s, ne prend ni le focus ni les
-clics, et suit le thème : couleur d'accent, police et taille de l'overlay.
+clics, et suit le thème : police, taille et couleurs de l'overlay.
 
 Activée, elle remplace les lignes de clic et de molette de la bulle — le geste
 s'affiche là où il se produit — tandis que les frappes continuent d'apparaître
 normalement. En mode clavier complet, la souris du schéma s'allume toujours en
 même temps.
+
+La pastille se dessine de trois façons, au choix dans la fenêtre de
+personnalisation (**Design des clics près du curseur**) ou avec la clé
+`cursor_style` :
+
+| Dessin | Rendu |
+| --- | --- |
+| `classic` | pastille pleine de la couleur d'accent, texte contrasté. |
+| `outline` | fond du panneau et trait d'accent : la version « contour », discrète sur un écran clair. |
+| `keycap` | une touche de clavier en miniature, avec son arête plus sombre. |
 
 ### Raccourcis globaux
 
@@ -519,8 +535,10 @@ Le dossier qui contient le fichier doit donc être accessible en écriture.
   "position": "bottom-right",
   "display_mode": "overlay",
   "keyboard_layout": "azerty",
+  "mouse_style": "classic",
   "show_mouse": true,
   "mouse_tracking": false,
+  "cursor_style": "classic",
   "keyboard_scale": 1.0,
   "language": "auto",
   "concat_text": false,
@@ -595,8 +613,10 @@ deux formes cohabitent.
 | `position` | `top-left`, `top-right`, `bottom-left`, `bottom-right` ou `bottom-center`. |
 | `display_mode` | `overlay` (pastilles de frappes) ou `keyboard` (clavier compact dont les touches s'allument). |
 | `keyboard_layout` | `azerty` ou `qwerty`, utilisé en mode `keyboard`. |
+| `mouse_style` | Dessin de la souris en mode `keyboard` : `classic` (fond plein), `outline` (traits seuls) ou `minimal` (silhouette, gestes seuls). Défaut `classic`. |
 | `show_mouse` | Afficher la souris à côté du clavier en mode `keyboard` (défaut `true`). |
 | `mouse_tracking` | Pastille près du curseur pour chaque clic et cran de molette, au lieu des lignes correspondantes dans la bulle (défaut `false`). |
+| `cursor_style` | Dessin de cette pastille : `classic` (accent plein), `outline` (fond du panneau, trait d'accent) ou `keycap` (touche de clavier). Défaut `classic`. |
 | `keyboard_scale` | Taille du clavier et de la souris, de `0.6` à `2.0` (défaut `1.0`), réglée avec la poignée de la bulle. |
 | `free_position` | Position libre enregistrée après un glisser, sous la forme `[x, y, largeur, hauteur]`. `null` = aucun déplacement manuel mémorisé. |
 | `language` | Langue de l'interface : `auto` (défaut, locale du système), `fr` ou `en`. |

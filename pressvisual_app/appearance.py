@@ -58,6 +58,10 @@ from .i18n import LANGUAGE_AUTO, _t
 from .icon import build_app_icon
 from .keyboard import InputView
 from .keymap import (
+    CURSOR_STYLE_LABELS,
+    CURSOR_STYLES,
+    MOUSE_STYLE_LABELS,
+    MOUSE_STYLES,
     TRANSITION_LABELS,
     TRANSITIONS,
     modifier_side_token,
@@ -711,11 +715,33 @@ class AppearanceDialog(QDialog):
         self.show_mouse.setChecked(bool(config.show_mouse))
         display_form.addRow(self.show_mouse)
 
+        self.mouse_style_combo = QComboBox(display_group)
+        for value in MOUSE_STYLES:
+            self.mouse_style_combo.addItem(_t(MOUSE_STYLE_LABELS[value]), value)
+        index = self.mouse_style_combo.findData(
+            str(config.mouse_style).strip().lower()
+        )
+        self.mouse_style_combo.setCurrentIndex(index if index >= 0 else 0)
+        display_form.addRow(_t("Design de la souris"), self.mouse_style_combo)
+
         self.mouse_tracking = QCheckBox(
             _t("Afficher les clics et la molette près du curseur"), display_group
         )
         self.mouse_tracking.setChecked(bool(config.mouse_tracking))
         display_form.addRow(self.mouse_tracking)
+
+        self.cursor_style_combo = QComboBox(display_group)
+        for value in CURSOR_STYLES:
+            self.cursor_style_combo.addItem(
+                _t(CURSOR_STYLE_LABELS[value]), value
+            )
+        index = self.cursor_style_combo.findData(
+            str(config.cursor_style).strip().lower()
+        )
+        self.cursor_style_combo.setCurrentIndex(index if index >= 0 else 0)
+        display_form.addRow(
+            _t("Design des clics près du curseur"), self.cursor_style_combo
+        )
 
         self.transition_combo = QComboBox(display_group)
         for value in TRANSITIONS:
@@ -793,6 +819,7 @@ class AppearanceDialog(QDialog):
         self.mode_combo.currentIndexChanged.connect(self._refresh_preview)
         self.layout_combo.currentIndexChanged.connect(self._refresh_preview)
         self.show_mouse.toggled.connect(self._refresh_preview)
+        self.mouse_style_combo.currentIndexChanged.connect(self._refresh_preview)
         self.transition_combo.currentIndexChanged.connect(self._refresh_preview)
         self.transition_duration.valueChanged.connect(self._refresh_preview)
 
@@ -818,7 +845,9 @@ class AppearanceDialog(QDialog):
             "display_mode": self.mode_combo.currentData() or "overlay",
             "keyboard_layout": self.layout_combo.currentData() or "azerty",
             "show_mouse": self.show_mouse.isChecked(),
+            "mouse_style": self.mouse_style_combo.currentData() or "classic",
             "mouse_tracking": self.mouse_tracking.isChecked(),
+            "cursor_style": self.cursor_style_combo.currentData() or "classic",
             "transition": self.transition_combo.currentData() or "fade",
             "transition_out_ms": self.transition_duration.value(),
             "opacity": self.opacity_slider.value() / 100.0,
@@ -866,7 +895,11 @@ class AppearanceDialog(QDialog):
             index = self.layout_combo.findData(defaults.keyboard_layout)
             self.layout_combo.setCurrentIndex(index if index >= 0 else 0)
             self.show_mouse.setChecked(defaults.show_mouse)
+            index = self.mouse_style_combo.findData(defaults.mouse_style)
+            self.mouse_style_combo.setCurrentIndex(index if index >= 0 else 0)
             self.mouse_tracking.setChecked(defaults.mouse_tracking)
+            index = self.cursor_style_combo.findData(defaults.cursor_style)
+            self.cursor_style_combo.setCurrentIndex(index if index >= 0 else 0)
             index = self.transition_combo.findData(defaults.transition)
             self.transition_combo.setCurrentIndex(index if index >= 0 else 0)
             self.transition_duration.setValue(int(defaults.transition_out_ms))

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtGui import QFont, QPainter, QPixmap, QRegion
+from PyQt6.QtWidgets import QWidget
 
 import pressvisual
 from pressvisual import MouseEvent
@@ -127,6 +129,98 @@ def test_view_paints_with_and_without_highlights(qapp, config):
 
         assert not empty.isNull() and not lit.isNull()
         assert empty != lit
+    finally:
+        view.deleteLater()
+
+
+# ---------------------------------------------------------------------------
+# Designs
+# ---------------------------------------------------------------------------
+
+
+def test_mouse_style_defaults_to_classic(qapp, config):
+    view = make_view(qapp, config)
+    try:
+        assert pressvisual.Config().mouse_style == "classic"
+        assert view.style == "classic"
+    finally:
+        view.deleteLater()
+
+
+def test_each_style_draws_differently(qapp, config):
+    view = make_view(qapp, config, height=200)
+    try:
+        view.resize(view.sizeHint())
+        classic = view.grab().toImage()
+
+        view.set_style("outline")
+        outline = view.grab().toImage()
+
+        view.set_style("minimal")
+        minimal = view.grab().toImage()
+
+        assert view.style == "minimal"
+        assert classic != outline
+        assert outline != minimal
+        assert classic != minimal
+    finally:
+        view.deleteLater()
+
+
+def test_style_fills_are_distinct(qapp, config):
+    """Fond plein, traits seuls, silhouette translucide : trois rendus."""
+    font = QFont("DejaVu Sans")
+    font.setPointSize(14)
+    palette = pressvisual.Palette.from_config(config)
+    alpha: dict[str, int] = {}
+
+    for style in pressvisual.MOUSE_STYLES:
+        view = pressvisual.InputView(
+            pressvisual.Config(display_mode="keyboard", mouse_style=style),
+            font,
+            palette,
+        )
+        try:
+            mouse = view.mouse
+            mouse.resize(mouse.sizeHint())
+            pixmap = QPixmap(mouse.size())
+            pixmap.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(pixmap)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            mouse.render(
+                painter, QPoint(), QRegion(), QWidget.RenderFlag.DrawChildren
+            )
+            painter.end()
+            point = pixmap.toImage().pixelColor(
+                mouse.width() // 2, mouse.height() - 30
+            )
+            alpha[style] = point.alpha()
+        finally:
+            view.deleteLater()
+
+    assert alpha["classic"] > 200
+    assert alpha["outline"] == 0
+    assert 0 < alpha["minimal"] < 100
+
+
+def test_unknown_style_falls_back_to_classic(qapp, config):
+    view = make_view(qapp, config)
+    try:
+        view.set_style("imaginaire")
+
+        assert view.style == "classic"
+    finally:
+        view.deleteLater()
+
+
+def test_style_survives_a_lit_button(qapp, config):
+    view = make_view(qapp, config, height=200)
+    try:
+        view.set_buttons(["left"])
+        view.set_style("outline")
+
+        assert view.active_buttons() == ["left"]
+        assert not view.grab().isNull()
     finally:
         view.deleteLater()
 
@@ -395,6 +489,23 @@ def test_keyboard_mode_paints_the_mouse(qapp, config):
 # ---------------------------------------------------------------------------
 # Fenêtre d'apparence
 # ---------------------------------------------------------------------------
+
+
+def test_preview_follows_the_mouse_style(qapp, config):
+    dialog = pressvisual.AppearanceDialog(config, "DejaVu Sans")
+    qapp.processEvents()
+    try:
+        dialog.mode_combo.setCurrentIndex(dialog.mode_combo.findData("keyboard"))
+        assert dialog.preview._mouse.style == "classic"
+
+        dialog.mouse_style_combo.setCurrentIndex(
+            dialog.mouse_style_combo.findData("minimal")
+        )
+
+        assert dialog.values()["mouse_style"] == "minimal"
+        assert dialog.preview._mouse.style == "minimal"
+    finally:
+        dialog.deleteLater()
 
 
 def test_preview_hides_the_mouse_when_unchecked(qapp, config):

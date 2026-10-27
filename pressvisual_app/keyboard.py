@@ -529,7 +529,7 @@ class InputView(QWidget):
 
         self.keyboard = KeyboardView(config, font, palette, self)
         self.keyboard.set_scale(config.keyboard_scale)
-        self.mouse = MouseView(palette, self)
+        self.mouse = MouseView(palette, self, config.mouse_style)
         self._layout.addWidget(self.keyboard, 0, Qt.AlignmentFlag.AlignBottom)
         self._layout.addWidget(self.mouse, 0, Qt.AlignmentFlag.AlignBottom)
 
@@ -547,6 +547,7 @@ class InputView(QWidget):
         self._cfg = config
         self.keyboard.set_config(config)
         self.keyboard.set_scale(config.keyboard_scale)
+        self.mouse.set_style(config.mouse_style)
         self._sync_mouse()
         self._apply_visibility()
 

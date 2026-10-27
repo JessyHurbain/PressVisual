@@ -5,6 +5,10 @@ droit, molette et deux boutons latéraux. Un bouton s'allume tant qu'il est
 enfoncé ; la molette s'allume brièvement en indiquant le sens du défilement,
 puisqu'un cran de molette n'a pas de relâchement.
 
+Trois dessins sont proposés (``mouse_style``) : « classic » avec un fond plein
+et des boutons séparés, « outline » en traits seuls, et « minimal » où la
+souris reste une silhouette et où seuls les gestes apparaissent.
+
 La vue ne dessine que la souris : c'est la fenêtre de l'overlay qui peint le
 panneau, les coins arrondis et l'opacité.
 """
@@ -17,10 +21,20 @@ from PyQt6.QtCore import QPointF, QRectF, QSize, Qt
 from PyQt6.QtGui import QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QSizePolicy, QWidget
 
+from .keymap import MOUSE_STYLES
 from .theme import Palette, _with_alpha
 
 #: Boutons suivis, dans l'ordre de la souris.
 MOUSE_BUTTONS: tuple[str, ...] = ("left", "right", "middle", "back", "forward")
+
+#: Dessin utilisé quand la configuration n'en donne pas (ou un inconnu).
+DEFAULT_MOUSE_STYLE = "classic"
+
+
+def _normalize_style(style: str) -> str:
+    """Nom de dessin valide, ou « classic »."""
+    value = str(style or "").strip().lower()
+    return value if value in MOUSE_STYLES else DEFAULT_MOUSE_STYLE
 
 #: Durée d'allumage du défilement (un cran de molette n'est pas relâché).
 MOUSE_SCROLL_FLASH_MS = 320
@@ -36,9 +50,11 @@ class MouseView(QWidget):
         self,
         palette: Palette,
         parent: Optional[QWidget] = None,
+        style: str = DEFAULT_MOUSE_STYLE,
     ) -> None:
         super().__init__(parent)
         self._palette = palette
+        self._style = _normalize_style(style)
         self._buttons: frozenset[str] = frozenset()
         self._scroll: Optional[tuple[str, int]] = None
         self._height = 150.0
@@ -49,6 +65,18 @@ class MouseView(QWidget):
     # ------------------------------------------------------------------
     # État
     # ------------------------------------------------------------------
+    @property
+    def style(self) -> str:
+        """Dessin courant (``classic``, ``outline`` ou ``minimal``)."""
+        return self._style
+
+    def set_style(self, style: str) -> None:
+        """Change le dessin ; l'état allumé est conservé."""
+        value = _normalize_style(style)
+        if value != self._style:
+            self._style = value
+            self.update()
+
     @property
     def scroll(self) -> Optional[tuple[str, int]]:
         """Dernier défilement affiché : ``(axe, sens)`` ou ``None``."""
@@ -129,6 +157,16 @@ class MouseView(QWidget):
         if lit:
             painter.setBrush(_with_alpha(self._palette.accent, 0.95))
             painter.setPen(QPen(_with_alpha(self._palette.accent_soft, 0.9), 1.0))
+        elif self._style == "minimal":
+            # Silhouette : rien tant que le bouton n'est pas enfoncé.
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(Qt.PenStyle.NoPen)
+        elif self._style == "outline":
+            # Le corps n'étant pas rempli, les traits prennent la couleur du
+            # texte du panneau : le texte des touches serait illisible sur le
+            # fond sombre de la bulle.
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(QPen(_with_alpha(self._palette.text, 0.55), 1.0))
         else:
             painter.setBrush(
                 _with_alpha(self._palette.key_text, 0.07)
@@ -196,7 +234,15 @@ class MouseView(QWidget):
         corner = min(body.width(), body.height()) * 0.46
         outline = QPainterPath()
         outline.addRoundedRect(body, corner, corner)
-        painter.fillPath(outline, _with_alpha(self._palette.key_bg, 0.9))
+        if self._style != "outline":
+            # « minimal » se fond dans le panneau : une silhouette translucide,
+            # où seuls les gestes ressortent.
+            fill = (
+                _with_alpha(self._palette.text, 0.10)
+                if self._style == "minimal"
+                else _with_alpha(self._palette.key_bg, 0.9)
+            )
+            painter.fillPath(outline, fill)
         painter.setClipPath(outline)
 
         band = body.height() * 0.32
@@ -238,11 +284,23 @@ class MouseView(QWidget):
 
         wheel_lit = "middle" in self._buttons or self._scroll is not None
         self._paint_region(painter, wheel, wheel_lit, radius=wheel_width / 2.0)
+        if self._style == "minimal" and not wheel_lit:
+            # La molette reste dessinée au repos : c'est elle qui fait lire la
+            # silhouette comme une souris.
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(QPen(_with_alpha(self._palette.text, 0.40), 1.0))
+            painter.drawRoundedRect(wheel, wheel_width / 2.0, wheel_width / 2.0)
         if self._scroll is not None:
             axis, direction = self._scroll
             self._paint_scroll(painter, wheel, axis, direction)
 
         painter.setClipping(False)
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.setPen(QPen(_with_alpha(self._palette.key_text, 0.30), 1.0))
+        if self._style == "outline":
+            border = _with_alpha(self._palette.text, 0.60)
+        elif self._style == "minimal":
+            border = _with_alpha(self._palette.text, 0.40)
+        else:
+            border = _with_alpha(self._palette.key_text, 0.30)
+        painter.setPen(QPen(border, 1.0))
         painter.drawPath(outline)

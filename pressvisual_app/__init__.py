@@ -50,7 +50,7 @@ from .config import (
     _color_to_text,
 )
 from .constants import APP_NAME
-from .cursor import CURSOR_BADGE_MS, CursorBadge
+from .cursor import CURSOR_BADGE_MS, DEFAULT_CURSOR_STYLE, CursorBadge
 from .events import InputBridge, KeyEvent, MouseEvent
 from .i18n import (
     LANGUAGE_AUTO,
@@ -74,11 +74,15 @@ from .keyboard import (
     layout_for,
 )
 from .keymap import (
+    CURSOR_STYLE_LABELS,
+    CURSOR_STYLES,
     DISPLAY_MODES,
     KEYBOARD_LAYOUTS,
     MODIFIER_ALIASES,
     MODIFIER_KEYS,
     MODIFIER_ORDER,
+    MOUSE_STYLE_LABELS,
+    MOUSE_STYLES,
     MULTI_CLICK_LABELS,
     POSITION_CHOICES,
     POSITION_LABELS,
@@ -91,7 +95,12 @@ from .keymap import (
     parse_hotkey,
     should_use_combo,
 )
-from .mouse import MOUSE_BUTTONS, MOUSE_SCROLL_FLASH_MS, MouseView
+from .mouse import (
+    DEFAULT_MOUSE_STYLE,
+    MOUSE_BUTTONS,
+    MOUSE_SCROLL_FLASH_MS,
+    MouseView,
+)
 from .overlay import (
     KEYBOARD_MAX_LIT,
     MAX_TEXT_LENGTH,
@@ -111,9 +120,13 @@ __all__ = [
     "AppearanceDialog",
     "Badge",
     "CURSOR_BADGE_MS",
+    "CURSOR_STYLE_LABELS",
+    "CURSOR_STYLES",
     "ColorButton",
     "Config",
     "CursorBadge",
+    "DEFAULT_CURSOR_STYLE",
+    "DEFAULT_MOUSE_STYLE",
     "DISPLAY_MODES",
     "DOUBLE_CLICK_WINDOW",
     "InputBridge",
@@ -137,6 +150,8 @@ __all__ = [
     "MOUSE_BUTTON_NAMES",
     "MOUSE_BUTTONS",
     "MOUSE_SCROLL_FLASH_MS",
+    "MOUSE_STYLE_LABELS",
+    "MOUSE_STYLES",
     "MULTI_CLICK_LABELS",
     "MouseEvent",
     "MouseView",

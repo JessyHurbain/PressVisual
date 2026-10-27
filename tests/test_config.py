@@ -155,6 +155,50 @@ def test_mouse_tracking_accepts_a_string_boolean(tmp_path):
     assert config.mouse_tracking is True
 
 
+def test_mouse_style_is_saved_with_the_appearance(tmp_path):
+    path = tmp_path / "config.json"
+    config = pressvisual.Config()
+    config.path = path
+
+    assert config.save_appearance({"mouse_style": "outline"})
+
+    reloaded = pressvisual.Config.load(path, lambda _message: None)
+    reloaded.validate()
+    assert reloaded.mouse_style == "outline"
+    assert pressvisual.Config().mouse_style == "classic"
+
+
+def test_mouse_style_falls_back_to_classic():
+    config = pressvisual.Config(mouse_style="bizarre")
+
+    notes = config.validate()
+
+    assert config.mouse_style == "classic"
+    assert any("mouse_style" in note for note in notes)
+
+
+def test_cursor_style_is_saved_with_the_appearance(tmp_path):
+    path = tmp_path / "config.json"
+    config = pressvisual.Config()
+    config.path = path
+
+    assert config.save_appearance({"cursor_style": "keycap"})
+
+    reloaded = pressvisual.Config.load(path, lambda _message: None)
+    reloaded.validate()
+    assert reloaded.cursor_style == "keycap"
+    assert pressvisual.Config().cursor_style == "classic"
+
+
+def test_cursor_style_falls_back_to_classic():
+    config = pressvisual.Config(cursor_style="neon")
+
+    notes = config.validate()
+
+    assert config.cursor_style == "classic"
+    assert any("cursor_style" in note for note in notes)
+
+
 def test_load_applies_keys_and_signals_unknown_ones(tmp_path):
     path = tmp_path / "config.json"
     write_json(path, {"opacity": 0.5, "font_family": "Inter", "inconnue": 1})

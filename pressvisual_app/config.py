@@ -15,8 +15,10 @@ from PyQt6.QtGui import QColor
 from .constants import APP_NAME
 from .i18n import LANGUAGE_AUTO, SUPPORTED_LANGUAGES, _t
 from .keymap import (
+    CURSOR_STYLES,
     DISPLAY_MODES,
     KEYBOARD_LAYOUTS,
+    MOUSE_STYLES,
     POSITION_CHOICES,
     TRANSITIONS,
 )
@@ -47,8 +49,10 @@ APPEARANCE_CONFIG_KEYS: tuple[str, ...] = (
     "margin",
     "display_mode",
     "keyboard_layout",
+    "mouse_style",
     "show_mouse",
     "mouse_tracking",
+    "cursor_style",
     "transition",
     "transition_out_ms",
 )
@@ -87,10 +91,15 @@ class Config:
     position: str = "bottom-right"     # top-left | top-right | bottom-left | bottom-right | bottom-center
     display_mode: str = "overlay"      # overlay (pastilles) | keyboard (clavier complet)
     keyboard_layout: str = "azerty"    # azerty | qwerty
+    #: Dessin de la souris du mode clavier : classic | outline | minimal.
+    mouse_style: str = "classic"
     show_mouse: bool = True            # souris à côté du clavier (mode keyboard)
     #: Pastille affichée près du curseur à chaque clic et chaque cran de molette.
     #: Activée, elle remplace les lignes de clic de la bulle.
     mouse_tracking: bool = False
+    #: Dessin de cette pastille : classic (pastille d'accent), outline (fond
+    #: du panneau et trait d'accent), keycap (touche de clavier).
+    cursor_style: str = "classic"
     keyboard_scale: float = 1.0        # taille du clavier, réglée à la souris
     #: Transition de la bulle (apparition et disparition) : fade (fondu),
     #: slide / slide-up / slide-left / slide-right (glissements), zoom
@@ -300,6 +309,26 @@ class Config:
             )
             layout = "azerty"
         self.keyboard_layout = layout
+
+        style = str(self.mouse_style or "classic").strip().lower()
+        if style not in MOUSE_STYLES:
+            notes.append(
+                _t("mouse_style inconnu ({value}) : « classic » utilisé.").format(
+                    value=repr(self.mouse_style)
+                )
+            )
+            style = "classic"
+        self.mouse_style = style
+
+        cursor_style = str(self.cursor_style or "classic").strip().lower()
+        if cursor_style not in CURSOR_STYLES:
+            notes.append(
+                _t("cursor_style inconnu ({value}) : « classic » utilisé.").format(
+                    value=repr(self.cursor_style)
+                )
+            )
+            cursor_style = "classic"
+        self.cursor_style = cursor_style
 
         self.language = str(self.language or LANGUAGE_AUTO).strip().lower()
         if self.language not in (LANGUAGE_AUTO, *SUPPORTED_LANGUAGES):
