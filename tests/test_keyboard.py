@@ -162,6 +162,48 @@ def test_held_modifiers_stay_lit(qapp, config):
         view.deleteLater()
 
 
+def test_only_the_pressed_ctrl_lights(qapp, config):
+    """Le côté vient de la capture : un seul des deux Ctrl s'allume."""
+    view = make_view(config, qapp)
+    try:
+        ctrl = [key for key in view.layout.iter_keys() if key.modifier == "ctrl"]
+        assert [key.side for key in ctrl] == ["left", "right"]
+
+        view.set_modifiers(["ctrl"])
+        view.set_modifier_sides(["ctrl_l"])
+        assert [view._is_active(key) for key in ctrl] == [True, False]
+
+        view.set_modifier_sides(["ctrl_r"])
+        assert [view._is_active(key) for key in ctrl] == [False, True]
+    finally:
+        view.deleteLater()
+
+
+def test_shift_side_matches_the_physical_key(qapp, config):
+    view = make_view(config, qapp)
+    try:
+        shift = [key for key in view.layout.iter_keys() if key.modifier == "shift"]
+
+        view.set_modifiers(["shift"])
+        view.set_modifier_sides(["shift_r"])
+
+        assert [view._is_active(key) for key in shift] == [False, True]
+    finally:
+        view.deleteLater()
+
+
+def test_missing_side_lights_both_keys(qapp, config):
+    """Sans côté connu (aperçu, tests), le comportement d'avant est conservé."""
+    view = make_view(config, qapp)
+    try:
+        view.set_modifiers(["ctrl"])
+        view.set_modifier_sides([])
+
+        assert view.active_labels() == ["Ctrl", "Ctrl"]
+    finally:
+        view.deleteLater()
+
+
 def test_modifier_labels_follow_the_configuration(qapp, config):
     config.ctrl_label = "Cmd"
     view = make_view(config, qapp)
@@ -328,6 +370,23 @@ def test_keyboard_mode_shows_held_modifiers(qapp, config):
 
         assert "C" in labels
         assert labels.count("Ctrl") == 2
+    finally:
+        overlay._hide_now()
+        overlay.deleteLater()
+        qapp.processEvents()
+
+
+def test_keyboard_mode_lights_only_the_pressed_side(qapp, config):
+    overlay = make_keyboard_overlay(qapp, config)
+    try:
+        # Ordre réel de la capture : le côté arrive avant le nom canonique.
+        overlay._on_modifier_sides(("ctrl_l",))
+        overlay._on_modifiers(("ctrl",))
+        overlay._on_key(KeyEvent(token="c", char="c", mods=("ctrl",)))
+
+        labels = overlay._keyboard.active_labels()
+
+        assert labels.count("Ctrl") == 1
     finally:
         overlay._hide_now()
         overlay.deleteLater()

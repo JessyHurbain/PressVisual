@@ -17,6 +17,7 @@ class Recorder:
         self.keys: list[pressvisual.KeyEvent] = []
         self.mouse: list[pressvisual.MouseEvent] = []
         self.modifiers: list[tuple[str, ...]] = []
+        self.modifier_sides: list[tuple[str, ...]] = []
         self.hotkeys: list[str] = []
         self.errors: list[str] = []
         self.releases: list[str] = []
@@ -26,6 +27,7 @@ class Recorder:
         self.bridge.mouse_event.connect(self.mouse.append)
         self.bridge.mouse_release.connect(self.mouse_releases.append)
         self.bridge.modifiers_changed.connect(self.modifiers.append)
+        self.bridge.modifier_sides_changed.connect(self.modifier_sides.append)
         self.bridge.hotkey.connect(self.hotkeys.append)
         self.bridge.error.connect(self.errors.append)
 
@@ -63,6 +65,36 @@ def test_modifier_release_removes_it(recorder, config):
     listener._on_release(keyboard.Key.ctrl)
 
     assert recorder.modifiers[-1] == ()
+
+
+def test_modifier_press_reports_its_physical_side(recorder, config):
+    listener = make_listener(recorder, config)
+
+    listener._on_press(keyboard.Key.ctrl_l)
+    listener._on_press(keyboard.Key.shift_r)
+
+    assert recorder.modifier_sides == [("ctrl_l",), ("ctrl_l", "shift_r")]
+    assert recorder.modifiers == [("ctrl",), ("ctrl", "shift")]
+
+
+def test_modifier_release_clears_its_side(recorder, config):
+    listener = make_listener(recorder, config)
+
+    listener._on_press(keyboard.Key.ctrl_l)
+    listener._on_release(keyboard.Key.ctrl_l)
+
+    assert recorder.modifier_sides == [("ctrl_l",), ()]
+
+
+def test_generic_modifier_counts_as_the_left_key(recorder, config):
+    """Sous X11 et macOS, le jeton sans suffixe est la touche de gauche."""
+    listener = make_listener(recorder, config)
+
+    listener._on_press(keyboard.Key.ctrl)
+    listener._on_release(keyboard.Key.ctrl)
+    listener._on_press(keyboard.Key.ctrl_r)
+
+    assert recorder.modifier_sides == [("ctrl_l",), (), ("ctrl_r",)]
 
 
 def test_printable_key_carries_modifiers(recorder, config):

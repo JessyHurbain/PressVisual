@@ -21,7 +21,7 @@ except Exception as exc:  # pragma: no cover - dépend de l'environnement
 
 from .events import InputBridge, KeyEvent, MouseEvent
 from .i18n import _t
-from .keymap import MODIFIER_KEYS, MODIFIER_ORDER
+from .keymap import MODIFIER_KEYS, MODIFIER_ORDER, modifier_side_token
 
 if TYPE_CHECKING:
     from .config import Config
@@ -98,6 +98,9 @@ class InputListener(threading.Thread):
         self._stop_event = threading.Event()
 
         self._mods: set[str] = set()
+        #: Côtés physiques enfoncés (``ctrl_l``, ``shift_r``...), pour
+        #: n'allumer que la touche réellement tenue sur le clavier affiché.
+        self._mod_sides: set[str] = set()
         self._held: set[str] = set()
         self._altgr = False
         self._last_click: Optional[tuple[float, int, int, int]] = None
@@ -174,6 +177,20 @@ class InputListener(threading.Thread):
     def _mods_snapshot(self) -> tuple[str, ...]:
         return tuple(m for m in MODIFIER_ORDER if m in self._mods)
 
+    def _mod_sides_snapshot(self) -> tuple[str, ...]:
+        return tuple(sorted(self._mod_sides))
+
+    def _emit_modifiers(self) -> None:
+        """Signale les modificateurs tenus : côtés d'abord, noms ensuite.
+
+        L'interface reçoit ainsi le côté avant le nom et n'allume que la
+        touche enfoncée, sans passer par un état où les deux s'allument.
+        """
+        if not self._config.capture_keyboard or self._altgr:
+            return
+        self._bridge.modifier_sides_changed.emit(self._mod_sides_snapshot())
+        self._bridge.modifiers_changed.emit(self._mods_snapshot())
+
     def _on_press(self, key) -> None:
         try:
             if _is_altgr(key):
@@ -183,8 +200,8 @@ class InputListener(threading.Thread):
             token, char, is_modifier = _classify_key(key)
             if is_modifier:
                 self._mods.add(token)
-                if self._config.capture_keyboard and not self._altgr:
-                    self._bridge.modifiers_changed.emit(self._mods_snapshot())
+                self._mod_sides.add(_modifier_side(key, token))
+                self._emit_modifiers()
                 return
             if not token:
                 return
@@ -235,10 +252,10 @@ class InputListener(threading.Thread):
             token, _char, is_modifier = _classify_key(key)
             if is_modifier:
                 self._mods.discard(token)
+                self._mod_sides.discard(_modifier_side(key, token))
                 if token == "alt":
                     self._altgr = False
-                if self._config.capture_keyboard and not self._altgr:
-                    self._bridge.modifiers_changed.emit(self._mods_snapshot())
+                self._emit_modifiers()
                 return
             if token:
                 self._held.discard(token.lower())
@@ -325,6 +342,18 @@ class InputListener(threading.Thread):
 def _is_altgr(key) -> bool:
     """Vrai si la touche est AltGr (Windows/macOS)."""
     return isinstance(key, keyboard.Key) and key.name == "alt_gr"
+
+
+def _modifier_side(key, token: str) -> str:
+    """Côté enfoncé d'un modificateur (``ctrl_l``, ``shift_r``...).
+
+    Sous X11 et macOS, ``pynput`` construit son jeton générique (``ctrl``,
+    ``shift``) sur la touche de gauche : un nom sans suffixe désigne donc la
+    touche gauche. Windows distingue les deux côtés.
+    """
+    name = getattr(key, "name", None)
+    side = "right" if isinstance(name, str) and name.endswith("_r") else "left"
+    return modifier_side_token(token, side)
 
 
 def _classify_key(key) -> tuple[Optional[str], Optional[str], bool]:

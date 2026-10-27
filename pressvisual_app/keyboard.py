@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QSizePolicy, QWidget
 
 from .config import KEYBOARD_SCALE_MAX, KEYBOARD_SCALE_MIN, Config
 from .i18n import _t
+from .keymap import modifier_side_token
 from .mouse import MouseView
 from .theme import Palette, _with_alpha
 
@@ -34,6 +35,9 @@ class Key:
     secondary: str = ""
     #: Nom du modificateur tenu qui allume la touche (``ctrl``, ``shift``...).
     modifier: str = ""
+    #: Côté de la touche (``left`` / ``right``) : deux Ctrl existent, un seul
+    #: s'allume. Vide = l'un ou l'autre suffit (Win, Alt).
+    side: str = ""
 
 
 def _key(
@@ -42,6 +46,7 @@ def _key(
     secondary: str = "",
     width: float = 1.0,
     modifier: str = "",
+    side: str = "",
 ) -> Key:
     return Key(
         label=label,
@@ -49,6 +54,7 @@ def _key(
         width=width,
         secondary=secondary,
         modifier=modifier,
+        side=side,
     )
 
 
@@ -82,11 +88,11 @@ class KeyboardLayout:
 def _modifier_row() -> tuple[Key, ...]:
     """Rangée du bas, commune aux deux dispositions."""
     return (
-        _key("Ctrl", width=1.2, modifier="ctrl"),
+        _key("Ctrl", width=1.2, modifier="ctrl", side="left"),
         _key("Win", width=1.2, modifier="win"),
         _key("Alt", width=1.2, modifier="alt"),
         _key("Espace", "space", width=6.2),
-        _key("Ctrl", width=1.2, modifier="ctrl"),
+        _key("Ctrl", width=1.2, modifier="ctrl", side="right"),
         _key("←", "left"),
         _key("↑", "up"),
         _key("↓", "down"),
@@ -145,7 +151,7 @@ AZERTY = KeyboardLayout(
             _key("*", "*", "µ", secondary="µ", width=2.25),
         ),
         (
-            _key("Maj", width=2.25, modifier="shift"),
+            _key("Maj", width=2.25, modifier="shift", side="left"),
             _key("W", "w"),
             _key("X", "x"),
             _key("C", "c"),
@@ -156,7 +162,7 @@ AZERTY = KeyboardLayout(
             _key(";", ";", ".", secondary="."),
             _key(":", ":", "/", secondary="/"),
             _key("!", "!", "§", secondary="§"),
-            _key("Maj", width=2.75, modifier="shift"),
+            _key("Maj", width=2.75, modifier="shift", side="right"),
         ),
         _modifier_row(),
     ),
@@ -213,7 +219,7 @@ QWERTY = KeyboardLayout(
             _key("\\", "\\", "|", secondary="|", width=2.25),
         ),
         (
-            _key("Maj", width=2.25, modifier="shift"),
+            _key("Maj", width=2.25, modifier="shift", side="left"),
             _key("Z", "z"),
             _key("X", "x"),
             _key("C", "c"),
@@ -224,7 +230,7 @@ QWERTY = KeyboardLayout(
             _key(",", ",", "<", secondary="<"),
             _key(".", ".", ">", secondary=">"),
             _key("/", "/", "?", secondary="?"),
-            _key("Maj", width=2.75, modifier="shift"),
+            _key("Maj", width=2.75, modifier="shift", side="right"),
         ),
         _modifier_row(),
     ),
@@ -269,6 +275,7 @@ class KeyboardView(QWidget):
         self._small_font = QFont(self._base_small_font)
         self._active: frozenset[str] = frozenset()
         self._modifiers: frozenset[str] = frozenset()
+        self._modifier_sides: frozenset[str] = frozenset()
         self._masked = False
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
@@ -338,6 +345,17 @@ class KeyboardView(QWidget):
             self._modifiers = held
             self.update()
 
+    def set_modifier_sides(self, sides: Iterable[str]) -> None:
+        """Côtés physiques enfoncés (``ctrl_l``, ``shift_r``...).
+
+        Sert à n'allumer que le Ctrl réellement tenu. Sans côté connu, les
+        deux touches du modificateur s'allument, comme auparavant.
+        """
+        pressed = frozenset(sides)
+        if pressed != self._modifier_sides:
+            self._modifier_sides = pressed
+            self.update()
+
     def set_masked(self, masked: bool) -> None:
         masked = bool(masked)
         if masked != self._masked:
@@ -379,7 +397,13 @@ class KeyboardView(QWidget):
     # ------------------------------------------------------------------
     def _is_active(self, key: Key) -> bool:
         if key.modifier:
-            return key.modifier in self._modifiers
+            if key.modifier not in self._modifiers:
+                return False
+            if not key.side or not self._modifier_sides:
+                # Côté inconnu (aperçu, ou plateforme qui ne distingue pas les
+                # deux touches) : les deux touches du modificateur s'allument.
+                return True
+            return modifier_side_token(key.modifier, key.side) in self._modifier_sides
         matching = key.tokens & self._active
         if not matching:
             return False

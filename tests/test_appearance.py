@@ -285,7 +285,8 @@ def test_preview_animates_a_keystroke_and_a_click(qapp, config):
 
         labels = preview._keyboard.active_labels()
         assert "E" in labels
-        assert labels.count("Maj") == 2
+        # La démonstration enfonce la touche de gauche : un seul Maj s'allume.
+        assert labels.count("Maj") == 1
         assert preview._mouse.active_buttons() == ["right"]
         assert preview._mouse.scroll == ("vertical", 1)
         assert preview._demo_row._items == [("Clic droit", "mouse")]

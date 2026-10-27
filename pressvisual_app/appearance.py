@@ -57,7 +57,12 @@ from .constants import APP_NAME
 from .i18n import LANGUAGE_AUTO, _t
 from .icon import build_app_icon
 from .keyboard import InputView
-from .keymap import TRANSITION_LABELS, TRANSITIONS, transition_geometry
+from .keymap import (
+    TRANSITION_LABELS,
+    TRANSITIONS,
+    modifier_side_token,
+    transition_geometry,
+)
 from .theme import Palette, _config_color
 from .widgets import KeyRow
 
@@ -369,6 +374,11 @@ class PreviewPanel(QWidget):
             self._demo_step % len(steps)
         ]
         self._keyboard.set_modifiers(modifiers)
+        # La démonstration enfonce la touche de gauche : un seul Maj s'allume,
+        # comme dans l'overlay quand le côté est connu.
+        self._keyboard.set_modifier_sides(
+            modifier_side_token(modifier, "left") for modifier in modifiers
+        )
         self._keyboard.set_active(keys)
         self._mouse.set_buttons(buttons)
         if scroll is None:

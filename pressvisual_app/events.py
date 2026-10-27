@@ -53,6 +53,7 @@ class InputBridge(QObject):
     mouse_event = pyqtSignal(object)      # MouseEvent
     mouse_release = pyqtSignal(str)       # bouton de souris relâché
     modifiers_changed = pyqtSignal(object)  # tuple[str, ...]
+    modifier_sides_changed = pyqtSignal(object)  # tuple[str, ...] (ctrl_l, ...)
     hotkey = pyqtSignal(str)              # "toggle" | "masking" | ...
     error = pyqtSignal(str)
 

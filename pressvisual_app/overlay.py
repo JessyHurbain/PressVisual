@@ -117,6 +117,8 @@ class Overlay(QWidget):
         self._mode = "keyboard" if config.display_mode == "keyboard" else "overlay"
         self._kb_active: set[str] = set()
         self._kb_modifiers: set[str] = set()
+        #: Côtés physiques (``ctrl_l``...) : un seul Ctrl s'allume.
+        self._kb_modifier_sides: set[str] = set()
         self._mouse_buttons: set[str] = set()
         self._mouse_scroll: Optional[tuple[str, int]] = None
         self._dragging = False
@@ -299,6 +301,7 @@ class Overlay(QWidget):
     def _clear_keyboard(self) -> None:
         """Éteint toutes les touches du clavier et les boutons de la souris."""
         self._kb_active.clear()
+        self._kb_modifier_sides.clear()
         self._clear_mouse()
         self._apply_keyboard_state()
 
@@ -311,6 +314,7 @@ class Overlay(QWidget):
     def _apply_keyboard_state(self) -> None:
         self._keyboard.set_masked(self._masked)
         self._keyboard.set_modifiers(self._kb_modifiers)
+        self._keyboard.set_modifier_sides(self._kb_modifier_sides)
         self._keyboard.set_active(self._kb_active)
         self._mouse.set_buttons(self._mouse_buttons)
         if self._mouse_scroll is None:
@@ -1121,6 +1125,14 @@ class Overlay(QWidget):
         self._flush_typing()
         self._combo_row = self._new_row(self._combo_items(snapshot))
         self._bump()
+
+    def _on_modifier_sides(self, sides: Iterable[str]) -> None:
+        """Retient les côtés physiques enfoncés (``ctrl_l``, ``shift_r``...)."""
+        if not self._capture_enabled:
+            return
+        self._kb_modifier_sides = set(sides)
+        if self._mode == "keyboard":
+            self._apply_keyboard_state()
 
     def _on_key(self, event: KeyEvent) -> None:
         if not self._capture_enabled:

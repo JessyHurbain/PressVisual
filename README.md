@@ -353,7 +353,9 @@ comparer les styles et d'ajuster la durée sans quitter les réglages.
 Avec `"display_mode": "keyboard"`, la bulle affiche un **clavier compact** à
 la place des pastilles, flanqué à sa droite d'une **souris** : chaque touche
 s'allume **tant qu'elle est enfoncée** et s'éteint dès le relâchement ; les
-modificateurs (Ctrl, Alt, Maj, Win) restent allumés tant qu'ils sont maintenus.
+modificateurs (Ctrl, Alt, Maj, Win) restent allumés tant qu'ils sont maintenus,
+et seule la touche réellement tenue s'allume : le Ctrl gauche n'allume pas
+celui de droite.
 Il n'y a ni ligne de texte ni badge de clic : seuls le clavier et la souris
 réagissent, ce qui met le geste en avant pour une démonstration ou un tutoriel.
 

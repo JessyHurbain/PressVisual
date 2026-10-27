@@ -109,6 +109,25 @@ MODIFIER_KEYS: dict[str, str] = {
     "cmd_r": "win",
 }
 
+#: Préfixe pynput de chaque modificateur, pour nommer le côté enfoncé.
+MODIFIER_SIDE_PREFIXES: dict[str, str] = {
+    "ctrl": "ctrl",
+    "alt": "alt",
+    "shift": "shift",
+    "win": "cmd",
+}
+
+
+def modifier_side_token(modifier: str, side: str) -> str:
+    """Jeton du côté enfoncé d'un modificateur (``ctrl_l``, ``shift_r``...).
+
+    ``pynput`` nomme les deux touches d'un même modificateur ; c'est ce qui
+    permet de n'allumer que celle qui est tenue sur le clavier affiché.
+    """
+    prefix = MODIFIER_SIDE_PREFIXES.get(modifier, modifier)
+    return f"{prefix}_{'l' if side == 'left' else 'r'}"
+
+
 #: Alias acceptés dans les raccourcis de configuration.
 MODIFIER_ALIASES: dict[str, str] = {
     "ctrl": "ctrl",

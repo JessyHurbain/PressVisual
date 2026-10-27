@@ -320,6 +320,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     bridge.mouse_event.connect(overlay._on_mouse)
     bridge.mouse_release.connect(overlay._on_mouse_release)
     bridge.modifiers_changed.connect(overlay._on_modifiers)
+    bridge.modifier_sides_changed.connect(overlay._on_modifier_sides)
     bridge.hotkey.connect(dispatch_hotkey)
 
     def show_error(message: str) -> None:
