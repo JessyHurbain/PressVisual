@@ -198,6 +198,10 @@ def test_display_settings_are_translated(english, qapp, config):
             for index in range(dialog.mouse_style_combo.count())
         ]
 
+        tabs = [
+            dialog.tabs.tabText(index) for index in range(dialog.tabs.count())
+        ]
+        assert tabs == ["Display", "Colors", "Layout", "Interface"]
         assert styles == ["Classic", "Outline", "Minimal"]
         cursor_styles = [
             dialog.cursor_style_combo.itemText(index)

@@ -393,14 +393,12 @@ applique immédiatement le clavier ou les pastilles, sans redémarrer.
 ### Personnaliser l'apparence
 
 Clic droit sur l'icône de notification → **Personnaliser l'overlay…** ouvre une
-fenêtre de réglages avec un aperçu en direct :
+fenêtre de réglages avec un aperçu en direct. Les réglages sont répartis en
+quatre onglets ; l'aperçu reste visible sous les onglets et les boutons
+**Réinitialiser**, **Enregistrer** et **Annuler** restent en bas de la fenêtre,
+hors de tout défilement. Si l'écran est trop bas, chaque onglet défile à
+l'intérieur plutôt que d'allonger la fenêtre.
 
-- **Couleurs** : fond (haut et bas du dégradé), texte, fond et texte des
-  touches, couleur d'accent des clics et des messages d'état. Les badges de
-  modificateurs, les bordures et les séparateurs sont dérivés de ces couleurs
-  pour rester cohérents.
-- **Mise en forme** : police, taille, opacité du fond, rayon des coins, marge
-  avec le bord de l'écran et largeur maximale.
 - **Affichage** : mode (overlay standard ou clavier complet), disposition du
   clavier (AZERTY ou QWERTY), **design de la souris** (Classique, Contour ou
   Minimal), case **Afficher la souris à côté du clavier**, case **Afficher les
@@ -409,6 +407,12 @@ fenêtre de réglages avec un aperçu en direct :
   **Transition de la bulle** (fondu, glissements dans les quatre directions, zoom ou aucune)
   avec sa durée en millisecondes. L'aperçu bascule immédiatement sur le
   clavier, avec ou sans sa souris.
+- **Couleurs** : fond (haut et bas du dégradé), texte, fond et texte des
+  touches, couleur d'accent des clics et des messages d'état. Les badges de
+  modificateurs, les bordures et les séparateurs sont dérivés de ces couleurs
+  pour rester cohérents.
+- **Mise en forme** : police, taille, opacité du fond, rayon des coins, marge
+  avec le bord de l'écran et largeur maximale.
 - **Interface** : langue de l'interface (automatique, français ou anglais).
   Le changement s'applique dès l'enregistrement, sans redémarrer.
 - **Aperçu animé** : la démonstration rejoue en boucle une frappe et un clic

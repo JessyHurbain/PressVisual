@@ -624,6 +624,10 @@
         <translation>Minimal</translation>
     </message>
     <message>
+        <source>La langue s'applique dès l'enregistrement, sans redémarrer.</source>
+        <translation>The language is applied as soon as you save, without restarting.</translation>
+    </message>
+    <message>
         <source>cursor_style inconnu ({value}) : « classic » utilisé.</source>
         <translation>Unknown cursor_style ({value}): using "classic".</translation>
     </message>

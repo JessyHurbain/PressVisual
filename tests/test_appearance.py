@@ -6,7 +6,12 @@ import json
 
 from PyQt6.QtCore import QAbstractAnimation, QPoint
 from PyQt6.QtGui import QColor, QFontDatabase, QPixmap
-from PyQt6.QtWidgets import QApplication, QDialog
+from PyQt6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QDialogButtonBox,
+    QScrollArea,
+)
 
 import pressvisual
 from pressvisual_app import appearance as appearance_module
@@ -376,6 +381,38 @@ def test_dialog_exposes_mouse_styles(qapp, config):
         dialog._reset()
         assert dialog.mouse_style_combo.currentData() == "classic"
     finally:
+        dialog.deleteLater()
+
+
+def test_dialog_splits_its_settings_into_tabs(qapp, config):
+    dialog = make_dialog(qapp, config)
+    try:
+        titles = [
+            dialog.tabs.tabText(index) for index in range(dialog.tabs.count())
+        ]
+
+        assert titles == ["Affichage", "Couleurs", "Mise en forme", "Interface"]
+        for index in range(dialog.tabs.count()):
+            page = dialog.tabs.widget(index)
+            assert isinstance(page, QScrollArea)
+            assert page.widgetResizable()
+    finally:
+        dialog.deleteLater()
+
+
+def test_dialog_keeps_its_buttons_visible(qapp, config):
+    dialog = make_dialog(qapp, config)
+    try:
+        dialog.show()
+        qapp.processEvents()
+        save = dialog.buttons.button(QDialogButtonBox.StandardButton.Save)
+
+        assert save.isVisible()
+        centre = save.mapTo(dialog, save.rect().center())
+        assert dialog.rect().contains(centre)
+        assert dialog.buttons.parent() is dialog
+    finally:
+        dialog.close()
         dialog.deleteLater()
 
 

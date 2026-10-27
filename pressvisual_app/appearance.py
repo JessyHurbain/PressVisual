@@ -39,6 +39,7 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox,
     QFontComboBox,
     QFormLayout,
+    QFrame,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -48,6 +49,7 @@ from PyQt6.QtWidgets import (
     QSlider,
     QSpinBox,
     QStackedLayout,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -599,7 +601,7 @@ class AppearanceDialog(QDialog):
         self.setWindowIcon(build_app_icon())
         self.setModal(True)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
-        self.setMinimumWidth(580)
+        self.setMinimumWidth(620)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(18, 16, 18, 16)
@@ -636,7 +638,6 @@ class AppearanceDialog(QDialog):
             self.color_buttons[key] = button
         for column in range(3):
             grid.setColumnStretch(column, 1)
-        outer.addWidget(colors_group)
 
         form_group = QGroupBox(_t("Mise en forme"), self)
         form = QFormLayout(form_group)
@@ -682,7 +683,6 @@ class AppearanceDialog(QDialog):
         self.max_width.setSuffix(" px")
         self.max_width.setValue(config.max_width)
         form.addRow(_t("Largeur maximale"), self.max_width)
-        outer.addWidget(form_group)
 
         display_group = QGroupBox(_t("Affichage"), self)
         display_form = QFormLayout(display_group)
@@ -758,7 +758,6 @@ class AppearanceDialog(QDialog):
         self.transition_duration.setSuffix(" ms")
         self.transition_duration.setValue(int(config.transition_out_ms))
         display_form.addRow(_t("Durée de la disparition"), self.transition_duration)
-        outer.addWidget(display_group)
 
         interface_group = QGroupBox(_t("Interface"), self)
         interface_form = QFormLayout(interface_group)
@@ -776,7 +775,31 @@ class AppearanceDialog(QDialog):
         )
         self.language_combo.setCurrentIndex(index if index >= 0 else 0)
         interface_form.addRow(_t("Langue"), self.language_combo)
-        outer.addWidget(interface_group)
+
+        language_note = QLabel(
+            _t("La langue s'applique dès l'enregistrement, sans redémarrer."),
+            interface_group,
+        )
+        language_note.setWordWrap(True)
+        interface_form.addRow(language_note)
+
+        #: Onglets des réglages : chaque page défile si la fenêtre est basse,
+        #: l'aperçu et les boutons restant toujours visibles.
+        self.tabs = QTabWidget(self)
+        self.tabs.setDocumentMode(True)
+        #: Assez haut pour voir plusieurs réglages ; les pages défilent.
+        self.tabs.setMinimumHeight(200)
+        self.tabs.addTab(
+            self._make_page(display_group), _t("Affichage")
+        )
+        self.tabs.addTab(self._make_page(colors_group), _t("Couleurs"))
+        self.tabs.addTab(
+            self._make_page(form_group), _t("Mise en forme")
+        )
+        self.tabs.addTab(
+            self._make_page(interface_group, margin=6), _t("Interface")
+        )
+        outer.addWidget(self.tabs, 1)
 
         preview_group = QGroupBox(_t("Aperçu"), self)
         preview_layout = QVBoxLayout(preview_group)
@@ -785,10 +808,11 @@ class AppearanceDialog(QDialog):
         preview_scroll = QScrollArea(preview_group)
         preview_scroll.setWidgetResizable(True)
         preview_scroll.setWidget(self.preview)
-        preview_scroll.setMinimumHeight(160)
-        preview_scroll.setMaximumHeight(200)
+        preview_scroll.setFixedHeight(240)
         preview_layout.addWidget(preview_scroll)
-        outer.addWidget(preview_group)
+        preview_group.setMaximumHeight(290)
+        outer.addWidget(preview_group, 0)
+        self.preview_scroll = preview_scroll
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save
@@ -799,6 +823,7 @@ class AppearanceDialog(QDialog):
         buttons.button(QDialogButtonBox.StandardButton.Cancel).setText(_t("Annuler"))
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
+        self.buttons = buttons
 
         reset = QPushButton(_t("Réinitialiser"), self)
         bottom = QHBoxLayout()
@@ -823,16 +848,49 @@ class AppearanceDialog(QDialog):
         self.transition_combo.currentIndexChanged.connect(self._refresh_preview)
         self.transition_duration.valueChanged.connect(self._refresh_preview)
 
-        self._refresh_preview()
-        self.adjustSize()
         screen = QGuiApplication.screenAt(QCursor.pos())
         if screen is None:
             screen = QGuiApplication.primaryScreen()
+        if screen is not None and screen.availableGeometry().height() < 760:
+            # Écran bas : l'aperçu et les onglets cèdent de la place plutôt
+            # que de pousser les boutons hors de la fenêtre.
+            self.tabs.setMinimumHeight(150)
+            self.preview_scroll.setFixedHeight(150)
+
+        self._refresh_preview()
+        self.adjustSize()
         if screen is not None:
+            available = screen.availableGeometry()
+            # La fenêtre ne dépasse jamais l'écran : les pages défilent et
+            # les boutons restent accessibles.
+            self.resize(
+                min(self.width(), max(460, available.width() - 40)),
+                min(self.height(), max(420, available.height() - 60)),
+            )
             geometry = self.frameGeometry()
-            geometry.moveCenter(screen.availableGeometry().center())
+            geometry.moveCenter(available.center())
             self.move(geometry.topLeft())
         self.font_combo.setFocus()
+
+    # ------------------------------------------------------------------
+    def _make_page(self, *groups: QWidget, margin: int = 10) -> QScrollArea:
+        """Page d'onglet : les groupes, dans une zone qui défile au besoin."""
+        content = QWidget(self.tabs)
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(margin, margin, margin, margin)
+        layout.setSpacing(10)
+        for group in groups:
+            layout.addWidget(group)
+        layout.addStretch(1)
+
+        page = QScrollArea(self.tabs)
+        page.setWidgetResizable(True)
+        page.setFrameShape(QFrame.Shape.NoFrame)
+        page.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        page.setWidget(content)
+        return page
 
     # ------------------------------------------------------------------
     def values(self) -> dict[str, object]:
