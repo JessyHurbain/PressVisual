@@ -979,13 +979,18 @@ distribution la plus ancienne que vous ciblez : l'AppImage hérite de sa version
 de glibc.
 
 **Publication automatique.** Pousser un tag `v*` déclenche
-[`.github/workflows/release.yml`](.github/workflows/release.yml) : la suite de
-tests est rejouée, puis **trois binaires** sont construits avec le numéro du tag
-— l'AppImage sur Ubuntu, le `.exe` sur Windows et le `.dmg` sur macOS —, chacun
-conservé comme artefact du workflow. Une quatrième tâche attend les trois et les
-attache à la release GitHub du tag, créée si elle n'existe pas encore. Un
-lancement manuel du workflow produit seulement les artefacts, sans toucher aux
-releases.
+[`.github/workflows/release.yml`](.github/workflows/release.yml). Sa **première
+tâche interroge le workflow Tests** sur le commit exact porté par le tag : sans
+exécution verte, la release s'arrête là et rien n'est construit. Un tag posé sur
+un commit jamais poussé sur `main` — donc jamais éprouvé par la matrice complète —
+ou dont les tests ont échoué est ainsi refusé ; une exécution encore en cours
+dispose de jusqu'à 30 minutes pour aboutir. Les **trois binaires** sont ensuite
+construits avec le numéro du tag — l'AppImage sur Ubuntu, le `.exe` sur Windows
+et le `.dmg` sur macOS —, chacun conservé comme artefact du workflow ; la tâche
+AppImage rejoue la suite sur l'arbre empaqueté, par contrôle supplémentaire. Une
+cinquième tâche attend les trois et les attache à la release GitHub du tag, créée
+si elle n'existe pas encore. Un lancement manuel du workflow produit seulement
+les artefacts, sans toucher aux releases.
 
 Les notes de release sont **le message du tag annoté** :
 
