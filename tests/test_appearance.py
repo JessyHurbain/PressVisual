@@ -340,6 +340,23 @@ def test_preview_keyboard_paints(qapp, config):
         dialog.deleteLater()
 
 
+def test_dialog_exposes_mouse_tracking(qapp, config):
+    config.mouse_tracking = True
+    dialog = make_dialog(qapp, config)
+    try:
+        assert dialog.mouse_tracking.isChecked()
+        assert dialog.values()["mouse_tracking"] is True
+
+        dialog.mouse_tracking.setChecked(False)
+
+        assert dialog.values()["mouse_tracking"] is False
+
+        dialog._reset()
+        assert not dialog.mouse_tracking.isChecked()
+    finally:
+        dialog.deleteLater()
+
+
 def test_dialog_exposes_language_choice(qapp, config):
     dialog = make_dialog(qapp, config)
     try:

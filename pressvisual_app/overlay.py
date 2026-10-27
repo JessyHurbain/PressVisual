@@ -41,6 +41,7 @@ from .config import (
     Config,
 )
 from .constants import APP_NAME
+from .cursor import CursorBadge
 from .events import KeyEvent, MouseEvent
 from .i18n import _t
 from .keyboard import InputView
@@ -121,6 +122,8 @@ class Overlay(QWidget):
         self._kb_modifier_sides: set[str] = set()
         self._mouse_buttons: set[str] = set()
         self._mouse_scroll: Optional[tuple[str, int]] = None
+        #: Pastille près du pointeur (suivi de la souris), créée au premier usage.
+        self._cursor_badge: Optional[CursorBadge] = None
         self._dragging = False
         self._drag_origin = QPoint(0, 0)
         self._resizing = False
@@ -230,6 +233,9 @@ class Overlay(QWidget):
         visual = getattr(self, "_visual", None)
         if visual is not None:
             visual.set_font(self._badge_font)
+        badge = getattr(self, "_cursor_badge", None)
+        if badge is not None:
+            badge.set_font(self._badge_font)
 
     def apply_appearance(self, values: dict[str, object]) -> None:
         """Applique de nouveaux réglages d'apparence à l'overlay."""
@@ -240,6 +246,11 @@ class Overlay(QWidget):
 
         self._rebuild_fonts()
         self._palette.update_from_config(self._cfg)
+        if self._cursor_badge is not None:
+            self._cursor_badge.set_palette(self._palette)
+            self._cursor_badge.set_font(self._badge_font)
+            if not self._cfg.mouse_tracking:
+                self._cursor_badge.hide_badge()
         for row in self._rows:
             row.set_font(self._badge_font)
         if self._text_row is not None:
@@ -913,9 +924,18 @@ class Overlay(QWidget):
         self._slide_origin = None
         self._idle_timer.stop()
         self._typing_timer.stop()
+        if self._cursor_badge is not None:
+            self._cursor_badge.hide_badge()
         self.hide()
         self.setWindowOpacity(1.0)
         self._apply_anchor()
+
+    def closeEvent(self, event) -> None:  # noqa: N802 - API Qt
+        """Referme la pastille du curseur avec la fenêtre."""
+        if self._cursor_badge is not None:
+            self._cursor_badge.close()
+            self._cursor_badge = None
+        super().closeEvent(event)
 
     # ------------------------------------------------------------------
     # Lignes de l'overlay
@@ -1223,10 +1243,21 @@ class Overlay(QWidget):
         if ignores_overlay and self.geometry().contains(QPoint(event.x, event.y)):
             return
 
+        # Suivi de la souris : le clic ou le cran s'affiche près du pointeur.
+        if self._cfg.mouse_tracking and (
+            event.kind == "scroll" or (event.kind == "click" and event.button)
+        ):
+            self._show_cursor_event(event)
+
         # Le mode clavier n'affiche ni texte ni pastilles : la souris allume
         # ses boutons sur le schéma au lieu de créer une ligne.
         if self._mode == "keyboard":
             self._on_mouse_visual(event)
+            return
+
+        if self._cfg.mouse_tracking:
+            # Le geste est déjà montré près du curseur : pas de doublon dans
+            # la bulle.
             return
 
         if event.kind == "scroll":
@@ -1234,6 +1265,32 @@ class Overlay(QWidget):
             return
         if event.kind == "click" and event.button:
             self._on_click(event)
+
+    # ------------------------------------------------------------------
+    # Suivi de la souris : pastille près du pointeur
+    # ------------------------------------------------------------------
+    def _cursor_indicator(self) -> CursorBadge:
+        """Pastille du curseur, créée au premier clic affiché."""
+        if self._cursor_badge is None:
+            self._cursor_badge = CursorBadge(self._palette, self._badge_font)
+        return self._cursor_badge
+
+    def _show_cursor_event(self, event: MouseEvent) -> None:
+        """Affiche près du pointeur le clic ou le cran de molette."""
+        mods = tuple(m for m in MODIFIER_ORDER if m in set(event.mods))
+        if event.kind == "scroll":
+            axis = event.axis or "vertical"
+            label = self._scroll_label(axis, 1 if event.direction >= 0 else -1)
+        else:
+            label = self._click_label(event)
+        # Les séparateurs « + » de la bulle sont reconstruits ici : la
+        # pastille n'affiche que les libellés.
+        parts = [
+            part
+            for part, kind in self._mouse_items(mods, label)
+            if kind != "plus"
+        ]
+        self._cursor_indicator().show_label(" + ".join(parts))
 
     # ------------------------------------------------------------------
     # Souris du mode clavier
@@ -1318,6 +1375,21 @@ class Overlay(QWidget):
             )
         return _t(label)
 
+    def _click_label(self, event: MouseEvent) -> str:
+        """Libellé d'un clic, selon le bouton et le nombre de clics."""
+        button = event.button or "left"
+        if button == "right":
+            return _t(self._cfg.click_right_label)
+        if button == "middle":
+            return _t(self._cfg.click_middle_label)
+        if button == "back":
+            return _t(self._cfg.click_back_label)
+        if button == "forward":
+            return _t(self._cfg.click_forward_label)
+        if event.count >= 2:
+            return _t(MULTI_CLICK_LABELS.get(event.count, MULTI_CLICK_LABELS[3]))
+        return _t(self._cfg.click_left_label)
+
     def _on_click(self, event: MouseEvent) -> None:
         button = event.button or "left"
         now = time.monotonic()
@@ -1344,18 +1416,7 @@ class Overlay(QWidget):
         self._close_combo(remove=True)
         self._scroll_row = None
 
-        if button == "right":
-            label = _t(self._cfg.click_right_label)
-        elif button == "middle":
-            label = _t(self._cfg.click_middle_label)
-        elif button == "back":
-            label = _t(self._cfg.click_back_label)
-        elif button == "forward":
-            label = _t(self._cfg.click_forward_label)
-        elif event.count >= 2:
-            label = _t(MULTI_CLICK_LABELS.get(event.count, MULTI_CLICK_LABELS[3]))
-        else:
-            label = _t(self._cfg.click_left_label)
+        label = self._click_label(event)
 
         row = self._new_row(self._mouse_items(mods, label))
         if button == "left":

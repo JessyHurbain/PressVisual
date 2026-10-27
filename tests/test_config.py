@@ -129,6 +129,32 @@ def test_migration_does_not_revive_a_current_key(tmp_path):
     assert "fade_out_ms" not in data
 
 
+def test_mouse_tracking_is_saved_with_the_appearance(tmp_path):
+    path = tmp_path / "config.json"
+    config = pressvisual.Config()
+    config.path = path
+
+    assert config.save_appearance({"mouse_tracking": True})
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["mouse_tracking"] is True
+
+    reloaded = pressvisual.Config.load(path, lambda _message: None)
+    reloaded.validate()
+    assert reloaded.mouse_tracking is True
+    assert pressvisual.Config().mouse_tracking is False
+
+
+def test_mouse_tracking_accepts_a_string_boolean(tmp_path):
+    path = tmp_path / "config.json"
+    write_json(path, {"mouse_tracking": "oui"})
+
+    config = pressvisual.Config.load(path, lambda _message: None)
+    config.validate()
+
+    assert config.mouse_tracking is True
+
+
 def test_load_applies_keys_and_signals_unknown_ones(tmp_path):
     path = tmp_path / "config.json"
     write_json(path, {"opacity": 0.5, "font_family": "Inter", "inconnue": 1})

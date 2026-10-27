@@ -48,6 +48,7 @@ APPEARANCE_CONFIG_KEYS: tuple[str, ...] = (
     "display_mode",
     "keyboard_layout",
     "show_mouse",
+    "mouse_tracking",
     "transition",
     "transition_out_ms",
 )
@@ -87,6 +88,9 @@ class Config:
     display_mode: str = "overlay"      # overlay (pastilles) | keyboard (clavier complet)
     keyboard_layout: str = "azerty"    # azerty | qwerty
     show_mouse: bool = True            # souris à côté du clavier (mode keyboard)
+    #: Pastille affichée près du curseur à chaque clic et chaque cran de molette.
+    #: Activée, elle remplace les lignes de clic de la bulle.
+    mouse_tracking: bool = False
     keyboard_scale: float = 1.0        # taille du clavier, réglée à la souris
     #: Transition de la bulle (apparition et disparition) : fade (fondu),
     #: slide / slide-up / slide-left / slide-right (glissements), zoom
@@ -310,6 +314,7 @@ class Config:
             "capture_keyboard",
             "capture_mouse",
             "show_mouse",
+            "mouse_tracking",
             "ignore_key_repeats",
             "ignore_overlay_clicks",
             "concat_text",

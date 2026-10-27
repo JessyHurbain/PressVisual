@@ -20,6 +20,10 @@
         <translation>Show the mouse next to the keyboard</translation>
     </message>
     <message>
+        <source>Afficher les clics et la molette près du curseur</source>
+        <translation>Show clicks and scroll wheel movements next to the cursor</translation>
+    </message>
+    <message>
         <source>Afficher/masquer</source>
         <translation>Show/hide</translation>
     </message>

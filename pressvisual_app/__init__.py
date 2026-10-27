@@ -50,6 +50,7 @@ from .config import (
     _color_to_text,
 )
 from .constants import APP_NAME
+from .cursor import CURSOR_BADGE_MS, CursorBadge
 from .events import InputBridge, KeyEvent, MouseEvent
 from .i18n import (
     LANGUAGE_AUTO,
@@ -109,8 +110,10 @@ __all__ = [
     "AZERTY",
     "AppearanceDialog",
     "Badge",
+    "CURSOR_BADGE_MS",
     "ColorButton",
     "Config",
+    "CursorBadge",
     "DISPLAY_MODES",
     "DOUBLE_CLICK_WINDOW",
     "InputBridge",

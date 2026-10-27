@@ -398,8 +398,9 @@ fenêtre de réglages avec un aperçu en direct :
 - **Mise en forme** : police, taille, opacité du fond, rayon des coins, marge
   avec le bord de l'écran et largeur maximale.
 - **Affichage** : mode (overlay standard ou clavier complet), disposition du
-  clavier (AZERTY ou QWERTY), case **Afficher la souris à côté du clavier**
-  et **Transition de la bulle** (fondu, glissements dans les quatre
+  clavier (AZERTY ou QWERTY), case **Afficher la souris à côté du clavier**,
+  case **Afficher les clics et la molette près du curseur** (suivi de la
+  souris) et **Transition de la bulle** (fondu, glissements dans les quatre
   directions, zoom ou aucune) avec sa durée en millisecondes. L'aperçu
   bascule immédiatement sur le clavier, avec ou sans sa souris.
 - **Interface** : langue de l'interface (automatique, français ou anglais).
@@ -418,6 +419,19 @@ fenêtre de réglages avec un aperçu en direct :
 Les réglages sont conservés au prochain lancement. Ils ne touchent ni au
 positionnement (le dernier coin choisi reste mémorisé) ni au contenu affiché
 (durée, nombre de lignes, clavier/souris).
+
+### Suivi de la souris
+
+La case **Afficher les clics et la molette près du curseur** (clé
+`mouse_tracking`) affiche une petite pastille à côté du pointeur à chaque clic
+et chaque cran de molette, modificateurs compris (`Ctrl + Clic gauche`,
+`Maj + Scroll ←`). Elle s'efface seule après 0,7 s, ne prend ni le focus ni les
+clics, et suit le thème : couleur d'accent, police et taille de l'overlay.
+
+Activée, elle remplace les lignes de clic et de molette de la bulle — le geste
+s'affiche là où il se produit — tandis que les frappes continuent d'apparaître
+normalement. En mode clavier complet, la souris du schéma s'allume toujours en
+même temps.
 
 ### Raccourcis globaux
 
@@ -506,6 +520,7 @@ Le dossier qui contient le fichier doit donc être accessible en écriture.
   "display_mode": "overlay",
   "keyboard_layout": "azerty",
   "show_mouse": true,
+  "mouse_tracking": false,
   "keyboard_scale": 1.0,
   "language": "auto",
   "concat_text": false,
@@ -581,6 +596,7 @@ deux formes cohabitent.
 | `display_mode` | `overlay` (pastilles de frappes) ou `keyboard` (clavier compact dont les touches s'allument). |
 | `keyboard_layout` | `azerty` ou `qwerty`, utilisé en mode `keyboard`. |
 | `show_mouse` | Afficher la souris à côté du clavier en mode `keyboard` (défaut `true`). |
+| `mouse_tracking` | Pastille près du curseur pour chaque clic et cran de molette, au lieu des lignes correspondantes dans la bulle (défaut `false`). |
 | `keyboard_scale` | Taille du clavier et de la souris, de `0.6` à `2.0` (défaut `1.0`), réglée avec la poignée de la bulle. |
 | `free_position` | Position libre enregistrée après un glisser, sous la forme `[x, y, largeur, hauteur]`. `null` = aucun déplacement manuel mémorisé. |
 | `language` | Langue de l'interface : `auto` (défaut, locale du système), `fr` ou `en`. |

@@ -711,6 +711,12 @@ class AppearanceDialog(QDialog):
         self.show_mouse.setChecked(bool(config.show_mouse))
         display_form.addRow(self.show_mouse)
 
+        self.mouse_tracking = QCheckBox(
+            _t("Afficher les clics et la molette près du curseur"), display_group
+        )
+        self.mouse_tracking.setChecked(bool(config.mouse_tracking))
+        display_form.addRow(self.mouse_tracking)
+
         self.transition_combo = QComboBox(display_group)
         for value in TRANSITIONS:
             self.transition_combo.addItem(_t(TRANSITION_LABELS[value]), value)
@@ -812,6 +818,7 @@ class AppearanceDialog(QDialog):
             "display_mode": self.mode_combo.currentData() or "overlay",
             "keyboard_layout": self.layout_combo.currentData() or "azerty",
             "show_mouse": self.show_mouse.isChecked(),
+            "mouse_tracking": self.mouse_tracking.isChecked(),
             "transition": self.transition_combo.currentData() or "fade",
             "transition_out_ms": self.transition_duration.value(),
             "opacity": self.opacity_slider.value() / 100.0,
@@ -859,6 +866,7 @@ class AppearanceDialog(QDialog):
             index = self.layout_combo.findData(defaults.keyboard_layout)
             self.layout_combo.setCurrentIndex(index if index >= 0 else 0)
             self.show_mouse.setChecked(defaults.show_mouse)
+            self.mouse_tracking.setChecked(defaults.mouse_tracking)
             index = self.transition_combo.findData(defaults.transition)
             self.transition_combo.setCurrentIndex(index if index >= 0 else 0)
             self.transition_duration.setValue(int(defaults.transition_out_ms))

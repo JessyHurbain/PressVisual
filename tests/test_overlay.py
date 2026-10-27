@@ -334,6 +334,63 @@ def test_late_double_click_starts_a_new_row(overlay):
     ]
 
 
+def test_mouse_tracking_shows_clicks_next_to_the_cursor(overlay, config):
+    config.mouse_tracking = True
+    try:
+        overlay._on_mouse(MouseEvent(kind="click", button="left"))
+
+        assert items(overlay) == []
+        assert overlay._cursor_badge is not None
+        assert overlay._cursor_badge.label == "Clic gauche"
+        assert overlay._cursor_badge.isVisible()
+    finally:
+        overlay._cursor_badge.hide_badge()
+
+
+def test_mouse_tracking_labels_scroll_with_modifiers(overlay, config):
+    config.mouse_tracking = True
+    try:
+        overlay._on_mouse(
+            MouseEvent(kind="scroll", direction=1, mods=("ctrl",))
+        )
+
+        assert items(overlay) == []
+        assert overlay._cursor_badge.label == "Ctrl + Scroll ↑"
+    finally:
+        overlay._cursor_badge.hide_badge()
+
+
+def test_mouse_tracking_is_hidden_in_private_mode(overlay, config):
+    config.mouse_tracking = True
+    overlay._on_mouse(MouseEvent(kind="click", button="left"))
+    badge = overlay._cursor_badge
+
+    overlay.set_capture_enabled(False)
+
+    assert not badge.isVisible()
+
+
+def test_cursor_badge_paints_its_label(qapp, overlay, config):
+    config.mouse_tracking = True
+    badge = overlay._cursor_indicator()
+    try:
+        badge.show_label("Ctrl + Clic gauche")
+        qapp.processEvents()
+
+        assert badge.isVisible()
+        assert badge.width() > 60
+        assert not badge.grab().isNull()
+    finally:
+        badge.hide_badge()
+
+
+def test_mouse_tracking_off_keeps_the_bubble_rows(overlay):
+    overlay._on_mouse(MouseEvent(kind="click", button="left"))
+
+    assert overlay._cursor_badge is None
+    assert items(overlay) == [[("Clic gauche", "mouse")]]
+
+
 def test_mouse_capture_disabled_ignores_events(overlay, config):
     config.capture_mouse = False
 

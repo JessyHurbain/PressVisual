@@ -194,6 +194,9 @@ def test_display_settings_are_translated(english, qapp, config):
             "None",
         ]
         assert dialog.show_mouse.text() == "Show the mouse next to the keyboard"
+        assert dialog.mouse_tracking.text() == (
+            "Show clicks and scroll wheel movements next to the cursor"
+        )
     finally:
         dialog.deleteLater()
 
