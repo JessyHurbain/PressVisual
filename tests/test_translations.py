@@ -213,6 +213,9 @@ def test_display_settings_are_translated(english, qapp, config):
         assert dialog.mouse_tracking.text() == (
             "Show clicks and scroll wheel movements next to the cursor"
         )
+        assert dialog.count_repeats.text() == (
+            "Group repeated presses of the same key (×2)"
+        )
     finally:
         dialog.deleteLater()
 

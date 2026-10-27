@@ -276,10 +276,19 @@ virtuel : `[b]`, `[o]`, `[n]`, `[Espace]`, `[Entrée]`, `[Maj] + [→]`. Les
 caractères ne sont pas regroupés en mots : chaque frappe reste visible
 individuellement pendant la durée réglée.
 
+Deux appuis de suite sur la même touche ne s'empilent pas : la pastille
+reste unique et un petit **×2** la suit, puis **×3**, et ainsi de suite.
+L'appui suivant sur une autre touche — ou une ligne de souris, un texte, ou
+un passage où la bulle s'était effacée — remet le compte à zéro. Le réglage
+**Regrouper les appuis répétés de la même touche (×2)** (clé
+`count_repeats`, actif par défaut) le désactive pour revenir à une pastille
+par appui.
+
 Pour retrouver un affichage en texte continu (`bonjour le monde`), activez
 `concat_text` dans la configuration (ou lancez avec `--group-text`). Dans ce
 mode, les caractères s'ajoutent à la ligne en cours et une pause de
-`typing_join_delay` secondes clôt le mot.
+`typing_join_delay` secondes clôt le mot ; le compteur ne s'y applique pas,
+puisque les frappes s'écrivent déjà dans la même ligne.
 
 ### Positionner et déplacer l'overlay
 
@@ -441,7 +450,8 @@ l'intérieur plutôt que d'allonger la fenêtre.
   clavier (AZERTY ou QWERTY), **design de la souris** (Classique, Contour ou
   Minimal), case **Afficher la souris à côté du clavier**, case **Afficher les
   clics et la molette près du curseur** (suivi de la souris), son
-  **design des clics près du curseur** (Classique, Contour ou Touche) et
+  **design des clics près du curseur** (Classique, Contour ou Touche), case
+  **Regrouper les appuis répétés de la même touche** (voir plus haut) et
   **Transition de la bulle** (fondu, glissements dans les quatre directions, zoom ou aucune)
   avec sa durée en millisecondes. L'aperçu bascule immédiatement sur le
   clavier, avec ou sans sa souris.
@@ -600,6 +610,7 @@ Le dossier qui contient le fichier doit donc être accessible en écriture.
   "language": "auto",
   "concat_text": false,
   "typing_join_delay": 1.1,
+  "count_repeats": true,
 
   "background_color": "#26282f",
   "background_color_bottom": "#0e0f12",
@@ -681,6 +692,7 @@ deux formes cohabitent.
 | `language` | Langue de l'interface : `auto` (défaut, locale du système), `fr` ou `en`. |
 | `concat_text` | `false` (défaut) : une pastille par touche. `true` : les caractères s'ajoutent dans une ligne de texte. |
 | `typing_join_delay` | Pause (s) qui clôt la ligne de texte en mode `concat_text`. |
+| `count_repeats` | `true` (défaut) : deux appuis de suite sur la même touche affichent `×2` sur une seule pastille. `false` : une pastille par appui. |
 | `capture_keyboard` | Afficher les frappes (les raccourcis restent actifs même si `false`). |
 | `capture_mouse` | Afficher les clics et la molette. |
 | `ignore_key_repeats` | Ne pas répéter une touche maintenue enfoncée. |

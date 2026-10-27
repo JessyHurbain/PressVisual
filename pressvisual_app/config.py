@@ -119,6 +119,8 @@ class Config:
     language: str = LANGUAGE_AUTO       # auto (système) | fr | en
     concat_text: bool = False           # True = regrouper le texte, False = touche par touche
     typing_join_delay: float = 1.1     # délai de concaténation du texte (s)
+    #: Regrouper les appuis successifs de la même touche en un badge « ×2 ».
+    count_repeats: bool = True
 
     # --- Couleurs (format #RRGGBB ou #AARRGGBB) ----------------------------
     background_color: str = "#26282f"
@@ -382,6 +384,7 @@ class Config:
             "ignore_key_repeats",
             "ignore_overlay_clicks",
             "concat_text",
+            "count_repeats",
             "start_hidden",
             "click_through_on_start",
         ):

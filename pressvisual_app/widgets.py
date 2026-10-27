@@ -85,6 +85,8 @@ class Badge(QWidget):
             return QSize(text_width + 2, height)
         if self._kind == "status":
             return QSize(text_width + 16, height)
+        if self._kind == "count":
+            return QSize(text_width + 6, height)
         if self._kind == "mouse":
             return QSize(12 + 6 + 7 + text_width + 12, height)
         width = text_width + 2 * self.HORIZONTAL_PADDING
@@ -104,6 +106,13 @@ class Badge(QWidget):
 
         if self._kind == "plus":
             painter.setPen(_with_alpha(self._palette.muted, alpha))
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self._label)
+            return
+
+        if self._kind == "count":
+            # « ×2 » : un appui de plus sur la même touche, pas un nouveau
+            # badge — le compteur reste discret à côté de la pastille.
+            painter.setPen(_with_alpha(self._palette.accent_soft, alpha))
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self._label)
             return
 
@@ -174,6 +183,7 @@ class KeyRow(QWidget):
         self._palette = palette
         self._shape_for = shape_for
         self._items: list[tuple[str, str]] = []
+        self._count = 0
         self._badges: list[Badge] = []
         self._alpha = 1.0
         self._layout = QHBoxLayout(self)
@@ -185,9 +195,28 @@ class KeyRow(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
 
     # ------------------------------------------------------------------
+    @property
+    def items(self) -> list[tuple[str, str]]:
+        """Badges de la ligne, sans le compteur de répétitions."""
+        return list(self._items)
+
+    @property
+    def count(self) -> int:
+        """Appuis regroupés (0 ou 1 : aucun compteur affiché)."""
+        return self._count
+
     def set_items(self, items: Iterable[tuple[str, str]]) -> None:
         """Remplace le contenu de la ligne par ``[(libellé, type), ...]``."""
         self._items = list(items)
+        self._count = 0
+        self._rebuild()
+
+    def set_count(self, count: int) -> None:
+        """Regroupe ``count`` appuis identiques : « ×2 », « ×3 »…"""
+        count = max(0, int(count))
+        if count == self._count:
+            return
+        self._count = count
         self._rebuild()
 
     # ------------------------------------------------------------------
@@ -204,7 +233,11 @@ class KeyRow(QWidget):
             badge.deleteLater()
         self._badges.clear()
 
-        for label, kind in self._items:
+        items = list(self._items)
+        if self._count > 1:
+            items.append((f"×{self._count}", "count"))
+
+        for label, kind in items:
             shape = "rounded"
             if self._shape_for is not None and kind in ("key", "mod"):
                 shape = self._shape_for(label)

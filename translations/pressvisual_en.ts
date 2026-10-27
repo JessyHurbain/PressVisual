@@ -176,6 +176,10 @@
         <translation>Double click</translation>
     </message>
     <message>
+        <source>Deux appuis de suite affichent « ×2 » au lieu de deux pastilles.</source>
+        <translation>Two presses in a row show “×2” instead of two badges.</translation>
+    </message>
+    <message>
         <source>Début</source>
         <translation>Home</translation>
     </message>
@@ -350,6 +354,10 @@
     <message>
         <source>Raccourci global invalide ignoré : {spec}</source>
         <translation>Invalid global hotkey ignored: {spec}</translation>
+    </message>
+    <message>
+        <source>Regrouper les appuis répétés de la même touche (×2)</source>
+        <translation>Group repeated presses of the same key (×2)</translation>
     </message>
     <message>
         <source>Retour</source>

@@ -112,6 +112,8 @@ class Overlay(QWidget):
         self._scroll_mods: tuple[str, ...] = ()
         self._last_left_row: Optional[KeyRow] = None
         self._last_left_time = 0.0
+        #: Dernière ligne d'appui : elle peut compter les appuis suivants.
+        self._repeat_row: Optional[KeyRow] = None
 
         self._capture_enabled = not config.start_hidden
         self._click_through = False
@@ -927,6 +929,8 @@ class Overlay(QWidget):
         self._slide_origin = None
         self._idle_timer.stop()
         self._typing_timer.stop()
+        # La bulle s'efface : les appuis suivants repartent d'un compte neuf.
+        self._repeat_row = None
         if self._cursor_badge is not None:
             self._cursor_badge.hide_badge()
         self.hide()
@@ -962,6 +966,44 @@ class Overlay(QWidget):
         self._bump()
         return row
 
+    def _merge_repeat(self, row: KeyRow) -> None:
+        """Absorbe une ligne identique à la précédente en « ×N ».
+
+        Deux appuis de suite sur la même touche ne doivent pas empiler deux
+        pastilles identiques : la première compte les appuis. Une touche
+        intercalée, un texte, une ligne de souris ou un passage masqué
+        interrompt le compte.
+        """
+        previous = self._repeat_target(row)
+        if previous is None:
+            self._repeat_row = row
+            return
+        self._remove_row(row)
+        # Le premier compteur vaut « ×2 » : la pastille gardée est le premier
+        # appui, la ligne absorbée est le second.
+        previous.set_count(max(2, previous.count + 1))
+        self._repeat_row = previous
+        self._update_levels()
+        self._relayout()
+        self._bump()
+
+    def _repeat_target(self, row: KeyRow) -> Optional[KeyRow]:
+        """Ligne qui peut compter l'appui, si c'est bien le même."""
+        if not self._cfg.count_repeats or row not in self._rows:
+            return None
+        items = row.items
+        if not items or any(kind == "text" for _, kind in items):
+            return None
+        index = self._rows.index(row)
+        if index == 0:
+            return None
+        previous = self._rows[index - 1]
+        # Seule la ligne de l'appui précédent compte : après une autre touche
+        # ou un passage masqué, l'appui repart de un.
+        if previous is not self._repeat_row or previous.items != items:
+            return None
+        return previous
+
     def _remove_row(self, row: Optional[KeyRow]) -> None:
         if row is None or row not in self._rows:
             return
@@ -978,6 +1020,8 @@ class Overlay(QWidget):
             self._scroll_row = None
         if row is self._last_left_row:
             self._last_left_row = None
+        if row is self._repeat_row:
+            self._repeat_row = None
         self._update_levels()
         self._relayout()
 
@@ -996,6 +1040,8 @@ class Overlay(QWidget):
                 self._scroll_row = None
             if old is self._last_left_row:
                 self._last_left_row = None
+            if old is self._repeat_row:
+                self._repeat_row = None
 
     def _update_levels(self) -> None:
         levels = (1.0, 0.62, 0.34)
@@ -1015,6 +1061,7 @@ class Overlay(QWidget):
         self._combo_row = None
         self._scroll_row = None
         self._last_left_row = None
+        self._repeat_row = None
         self._typing_timer.stop()
         self._relayout()
 
@@ -1201,7 +1248,9 @@ class Overlay(QWidget):
             self._close_combo()
             self._scroll_row = None
             if self._text_row is None and not self._text:
-                self._new_row([(key_label(self._cfg, "space"), "key")])
+                self._merge_repeat(
+                    self._new_row([(key_label(self._cfg, "space"), "key")])
+                )
             else:
                 self._add_text_char(" ")
             return
@@ -1219,7 +1268,7 @@ class Overlay(QWidget):
             else:
                 # Mode touche par touche : une pastille par caractère.
                 label = "•" if self._masked else event.char
-                self._new_row([(label, "key")])
+                self._merge_repeat(self._new_row([(label, "key")]))
             return
 
         # Touche spéciale (Entrée, Tab, flèches...) ou combinaison.
@@ -1234,8 +1283,9 @@ class Overlay(QWidget):
             self._update_levels()
             self._relayout()
             self._bump()
+            self._merge_repeat(row)
         else:
-            self._new_row(items)
+            self._merge_repeat(self._new_row(items))
 
     # ------------------------------------------------------------------
     # Souris

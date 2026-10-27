@@ -438,6 +438,22 @@ def test_dialog_exposes_mouse_tracking(qapp, config):
         dialog.deleteLater()
 
 
+def test_dialog_exposes_repeat_counting(qapp, config):
+    dialog = make_dialog(qapp, config)
+    try:
+        assert dialog.count_repeats.isChecked() is True
+        assert dialog.values()["count_repeats"] is True
+
+        dialog.count_repeats.setChecked(False)
+
+        assert dialog.values()["count_repeats"] is False
+
+        dialog._reset()
+        assert dialog.count_repeats.isChecked() is True
+    finally:
+        dialog.deleteLater()
+
+
 def test_dialog_exposes_mouse_styles(qapp, config):
     dialog = make_dialog(qapp, config)
     try:

@@ -33,6 +33,96 @@ def test_plain_character_shows_one_key(overlay):
     assert items(overlay) == [[("a", "key")]]
 
 
+# ---------------------------------------------------------------------------
+# Appuis répétés
+# ---------------------------------------------------------------------------
+
+
+def test_repeated_key_is_counted(overlay):
+    for _ in range(3):
+        overlay._on_key(KeyEvent(token="a", char="a"))
+
+    assert items(overlay) == [[("a", "key")]]
+    row = overlay._rows[0]
+    assert row.count == 3
+    # Le compteur est un badge à part, après la touche.
+    assert [badge._label for badge in row._badges] == ["a", "×3"]
+
+
+def test_repeated_special_key_is_counted(overlay):
+    overlay._on_key(KeyEvent(token="enter", char=None))
+    overlay._on_key(KeyEvent(token="enter", char=None))
+
+    assert items(overlay) == [[("Entrée", "key")]]
+    assert overlay._rows[0].count == 2
+
+
+def test_another_key_starts_a_new_row(overlay):
+    overlay._on_key(KeyEvent(token="a", char="a"))
+    overlay._on_key(KeyEvent(token="b", char="b"))
+    overlay._on_key(KeyEvent(token="a", char="a"))
+
+    assert items(overlay) == [
+        [("a", "key")],
+        [("b", "key")],
+        [("a", "key")],
+    ]
+    assert [row.count for row in overlay._rows] == [0, 0, 0]
+
+
+def test_repeated_combination_is_counted(overlay):
+    for _ in range(2):
+        overlay._on_modifiers(["ctrl"])
+        overlay._on_key(KeyEvent(token="c", char=None, mods=("ctrl",)))
+        overlay._on_modifiers([])
+
+    assert items(overlay) == [[("Ctrl", "mod"), ("+", "plus"), ("C", "key")]]
+    assert overlay._rows[0].count == 2
+
+
+def test_repeat_counting_can_be_turned_off(overlay):
+    overlay._cfg.count_repeats = False
+
+    overlay._on_key(KeyEvent(token="a", char="a"))
+    overlay._on_key(KeyEvent(token="a", char="a"))
+
+    assert items(overlay) == [[("a", "key")], [("a", "key")]]
+
+
+def test_a_mouse_click_breaks_the_count(overlay):
+    overlay._on_key(KeyEvent(token="a", char="a"))
+    overlay._on_mouse(MouseEvent(kind="click", button="left"))
+    overlay._on_key(KeyEvent(token="a", char="a"))
+
+    assert items(overlay) == [
+        [("a", "key")],
+        [("Clic gauche", "mouse")],
+        [("a", "key")],
+    ]
+
+
+def test_hiding_restarts_the_count(overlay):
+    overlay._on_key(KeyEvent(token="a", char="a"))
+    overlay._on_key(KeyEvent(token="a", char="a"))
+
+    overlay._hide_now()
+    overlay._on_key(KeyEvent(token="a", char="a"))
+
+    assert items(overlay) == [[("a", "key")], [("a", "key")]]
+    # L'ancienne ligne garde son compteur : elle n'est plus étendue.
+    assert [row.count for row in overlay._rows] == [2, 0]
+
+
+def test_text_is_not_counted(overlay):
+    overlay._cfg.concat_text = True
+
+    for _ in range(3):
+        overlay._on_key(KeyEvent(token="a", char="a"))
+
+    assert items(overlay) == [[("aaa", "text")]]
+    assert overlay._rows[0].count == 0
+
+
 def test_special_key_uses_french_label(overlay):
     overlay._on_key(KeyEvent(token="enter", char=None))
 

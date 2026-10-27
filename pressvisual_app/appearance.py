@@ -818,6 +818,16 @@ class AppearanceDialog(QDialog):
         self.mouse_tracking.setChecked(bool(config.mouse_tracking))
         display_form.addRow(self.mouse_tracking)
 
+        self.count_repeats = QCheckBox(
+            _t("Regrouper les appuis répétés de la même touche (×2)"),
+            display_group,
+        )
+        self.count_repeats.setChecked(bool(config.count_repeats))
+        self.count_repeats.setToolTip(
+            _t("Deux appuis de suite affichent « ×2 » au lieu de deux pastilles.")
+        )
+        display_form.addRow(self.count_repeats)
+
         self.cursor_style_combo = QComboBox(display_group)
         for value in CURSOR_STYLES:
             self.cursor_style_combo.addItem(
@@ -939,6 +949,7 @@ class AppearanceDialog(QDialog):
         self.mode_combo.currentIndexChanged.connect(self._refresh_preview)
         self.layout_combo.currentIndexChanged.connect(self._refresh_preview)
         self.show_mouse.toggled.connect(self._refresh_preview)
+        self.count_repeats.toggled.connect(self._refresh_preview)
         self.mouse_style_combo.currentIndexChanged.connect(self._refresh_preview)
         self.transition_combo.currentIndexChanged.connect(self._refresh_preview)
         self.transition_duration.valueChanged.connect(self._refresh_preview)
@@ -1006,6 +1017,7 @@ class AppearanceDialog(QDialog):
             "show_mouse": self.show_mouse.isChecked(),
             "mouse_style": self.mouse_style_combo.currentData() or "classic",
             "mouse_tracking": self.mouse_tracking.isChecked(),
+            "count_repeats": self.count_repeats.isChecked(),
             "cursor_style": self.cursor_style_combo.currentData() or "classic",
             **self.key_editor.values(),
             "transition": self.transition_combo.currentData() or "fade",
@@ -1058,6 +1070,7 @@ class AppearanceDialog(QDialog):
             index = self.mouse_style_combo.findData(defaults.mouse_style)
             self.mouse_style_combo.setCurrentIndex(index if index >= 0 else 0)
             self.mouse_tracking.setChecked(defaults.mouse_tracking)
+            self.count_repeats.setChecked(defaults.count_repeats)
             index = self.cursor_style_combo.findData(defaults.cursor_style)
             self.cursor_style_combo.setCurrentIndex(index if index >= 0 else 0)
             index = self.transition_combo.findData(defaults.transition)

@@ -326,6 +326,18 @@ def test_show_mouse_is_on_by_default():
     assert pressvisual.Config().show_mouse is True
 
 
+def test_repeat_counting_is_on_by_default():
+    assert pressvisual.Config().count_repeats is True
+
+
+def test_validate_converts_count_repeats():
+    config = pressvisual.Config(count_repeats="non")
+
+    config.validate()
+
+    assert config.count_repeats is False
+
+
 def test_validate_normalises_filtered_keys():
     config = pressvisual.Config(filtered_keys=["A", "Espace", 12])
 
