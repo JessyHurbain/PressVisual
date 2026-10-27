@@ -21,6 +21,7 @@ from .config import KEYBOARD_SCALE_MAX, KEYBOARD_SCALE_MIN, Config
 from .i18n import _t
 from .keymap import modifier_side_token
 from .mouse import MouseView
+from .shapes import key_shape_path
 from .theme import Palette, _with_alpha
 
 
@@ -426,7 +427,8 @@ class KeyboardView(QWidget):
 
     def _paint_key(self, painter: QPainter, key: Key, rect: QRectF) -> None:
         active = self._is_active(key)
-        radius = max(3.0, min(6.0, rect.height() * 0.2))
+        # Forme choisie dans l'éditeur : globale, ou propre à cette touche.
+        path = key_shape_path(self._cfg.shape_for(key.label), rect)
 
         if active:
             painter.setBrush(_with_alpha(self._palette.accent, 0.95))
@@ -438,7 +440,7 @@ class KeyboardView(QWidget):
             painter.setPen(QPen(_with_alpha(self._palette.mod_border, 0.85), 1.0))
             main_color = _with_alpha(self._palette.key_text, 0.92)
             secondary_color = _with_alpha(self._palette.key_text, 0.55)
-        painter.drawRoundedRect(rect, radius, radius)
+        painter.drawPath(path)
 
         label = self._label(key)
         font = QFont(self._small_font) if len(label) > 3 else QFont(self._font)

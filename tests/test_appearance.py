@@ -391,7 +391,13 @@ def test_dialog_splits_its_settings_into_tabs(qapp, config):
             dialog.tabs.tabText(index) for index in range(dialog.tabs.count())
         ]
 
-        assert titles == ["Affichage", "Couleurs", "Mise en forme", "Interface"]
+        assert titles == [
+            "Affichage",
+            "Couleurs",
+            "Mise en forme",
+            "Touches",
+            "Interface",
+        ]
         for index in range(dialog.tabs.count()):
             page = dialog.tabs.widget(index)
             assert isinstance(page, QScrollArea)
@@ -413,6 +419,40 @@ def test_dialog_keeps_its_buttons_visible(qapp, config):
         assert dialog.buttons.parent() is dialog
     finally:
         dialog.close()
+        dialog.deleteLater()
+
+
+def test_dialog_exposes_the_key_editor(qapp, config):
+    dialog = make_dialog(qapp, config)
+    try:
+        assert dialog.key_editor.values()["key_shape"] == "rounded"
+
+        dialog.key_editor.brush_combo.setCurrentIndex(
+            dialog.key_editor.brush_combo.findData("star")
+        )
+        dialog.key_editor._paint_key("A")
+
+        assert dialog.values()["key_shapes"] == {"A": "star"}
+        assert dialog._preview_config().shape_for("A") == "star"
+
+        dialog._reset()
+        assert dialog.values()["key_shapes"] == {}
+        assert dialog.values()["key_shape"] == "rounded"
+    finally:
+        dialog.deleteLater()
+
+
+def test_dialog_key_editor_follows_the_layout(qapp, config):
+    dialog = make_dialog(qapp, config)
+    try:
+        assert "é" in dialog.key_editor._patches
+
+        dialog.layout_combo.setCurrentIndex(
+            dialog.layout_combo.findData("qwerty")
+        )
+
+        assert "é" not in dialog.key_editor._patches
+    finally:
         dialog.deleteLater()
 
 

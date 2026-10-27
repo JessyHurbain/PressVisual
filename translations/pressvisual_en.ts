@@ -624,6 +624,78 @@
         <translation>Minimal</translation>
     </message>
     <message>
+        <source>Touches</source>
+        <translation>Keys</translation>
+    </message>
+    <message>
+        <source>Formes des touches</source>
+        <translation>Key shapes</translation>
+    </message>
+    <message>
+        <source>Forme par défaut</source>
+        <translation>Default shape</translation>
+    </message>
+    <message>
+        <source>Forme à appliquer</source>
+        <translation>Shape to apply</translation>
+    </message>
+    <message>
+        <source>Cliquez une touche du clavier pour lui donner cette forme.</source>
+        <translation>Click a key to give it this shape.</translation>
+    </message>
+    <message>
+        <source>Appliquer à toutes</source>
+        <translation>Apply to all</translation>
+    </message>
+    <message>
+        <source>Effacer les exceptions</source>
+        <translation>Clear exceptions</translation>
+    </message>
+    <message>
+        <source>cliquer pour changer la forme</source>
+        <translation>click to change the shape</translation>
+    </message>
+    <message>
+        <source>Arrondie</source>
+        <translation>Rounded</translation>
+    </message>
+    <message>
+        <source>Carrée</source>
+        <translation>Square</translation>
+    </message>
+    <message>
+        <source>Ronde</source>
+        <translation>Round</translation>
+    </message>
+    <message>
+        <source>Pilule</source>
+        <translation>Pill</translation>
+    </message>
+    <message>
+        <source>Hexagone</source>
+        <translation>Hexagon</translation>
+    </message>
+    <message>
+        <source>Losange</source>
+        <translation>Diamond</translation>
+    </message>
+    <message>
+        <source>Fleur</source>
+        <translation>Flower</translation>
+    </message>
+    <message>
+        <source>Étoile</source>
+        <translation>Star</translation>
+    </message>
+    <message>
+        <source>key_shape inconnu ({value}) : « rounded » utilisé.</source>
+        <translation>Unknown key_shape ({value}): using “rounded”.</translation>
+    </message>
+    <message>
+        <source>key_shapes ignoré : un objet {touche: forme} est attendu.</source>
+        <translation>key_shapes ignored: an object {key: shape} is expected.</translation>
+    </message>
+    <message>
         <source>La langue s'applique dès l'enregistrement, sans redémarrer.</source>
         <translation>The language is applied as soon as you save, without restarting.</translation>
     </message>

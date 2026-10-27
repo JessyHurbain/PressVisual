@@ -201,7 +201,7 @@ def test_display_settings_are_translated(english, qapp, config):
         tabs = [
             dialog.tabs.tabText(index) for index in range(dialog.tabs.count())
         ]
-        assert tabs == ["Display", "Colors", "Layout", "Interface"]
+        assert tabs == ["Display", "Colors", "Layout", "Keys", "Interface"]
         assert styles == ["Classic", "Outline", "Minimal"]
         cursor_styles = [
             dialog.cursor_style_combo.itemText(index)

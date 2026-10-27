@@ -59,6 +59,7 @@ from .constants import APP_NAME
 from .i18n import LANGUAGE_AUTO, _t
 from .icon import build_app_icon
 from .keyboard import InputView
+from .keyeditor import KeyShapeEditor
 from .keymap import (
     CURSOR_STYLE_LABELS,
     CURSOR_STYLES,
@@ -783,6 +784,12 @@ class AppearanceDialog(QDialog):
         language_note.setWordWrap(True)
         interface_form.addRow(language_note)
 
+        shapes_group = QGroupBox(_t("Formes des touches"), self)
+        shapes_layout = QVBoxLayout(shapes_group)
+        shapes_layout.setContentsMargins(10, 10, 10, 10)
+        self.key_editor = KeyShapeEditor(config, font_family, shapes_group)
+        shapes_layout.addWidget(self.key_editor)
+
         #: Onglets des réglages : chaque page défile si la fenêtre est basse,
         #: l'aperçu et les boutons restant toujours visibles.
         self.tabs = QTabWidget(self)
@@ -796,6 +803,7 @@ class AppearanceDialog(QDialog):
         self.tabs.addTab(
             self._make_page(form_group), _t("Mise en forme")
         )
+        self.tabs.addTab(self._make_page(shapes_group), _t("Touches"))
         self.tabs.addTab(
             self._make_page(interface_group, margin=6), _t("Interface")
         )
@@ -847,6 +855,8 @@ class AppearanceDialog(QDialog):
         self.mouse_style_combo.currentIndexChanged.connect(self._refresh_preview)
         self.transition_combo.currentIndexChanged.connect(self._refresh_preview)
         self.transition_duration.valueChanged.connect(self._refresh_preview)
+        self.key_editor.changed.connect(self._refresh_preview)
+        self.layout_combo.currentIndexChanged.connect(self._sync_key_layout)
 
         screen = QGuiApplication.screenAt(QCursor.pos())
         if screen is None:
@@ -873,6 +883,10 @@ class AppearanceDialog(QDialog):
         self.font_combo.setFocus()
 
     # ------------------------------------------------------------------
+    def _sync_key_layout(self) -> None:
+        """La grille de l'éditeur suit la disposition choisie."""
+        self.key_editor.set_layout(str(self.layout_combo.currentData() or "azerty"))
+
     def _make_page(self, *groups: QWidget, margin: int = 10) -> QScrollArea:
         """Page d'onglet : les groupes, dans une zone qui défile au besoin."""
         content = QWidget(self.tabs)
@@ -906,6 +920,7 @@ class AppearanceDialog(QDialog):
             "mouse_style": self.mouse_style_combo.currentData() or "classic",
             "mouse_tracking": self.mouse_tracking.isChecked(),
             "cursor_style": self.cursor_style_combo.currentData() or "classic",
+            **self.key_editor.values(),
             "transition": self.transition_combo.currentData() or "fade",
             "transition_out_ms": self.transition_duration.value(),
             "opacity": self.opacity_slider.value() / 100.0,
@@ -961,6 +976,7 @@ class AppearanceDialog(QDialog):
             index = self.transition_combo.findData(defaults.transition)
             self.transition_combo.setCurrentIndex(index if index >= 0 else 0)
             self.transition_duration.setValue(int(defaults.transition_out_ms))
+            self.key_editor.reset()
         finally:
             self._updating = False
         self._refresh_preview()

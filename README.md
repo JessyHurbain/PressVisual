@@ -390,11 +390,42 @@ réagissent, ce qui met le geste en avant pour une démonstration ou un tutoriel
 Le mode se change à chaud : enregistrer dans la fenêtre de personnalisation
 applique immédiatement le clavier ou les pastilles, sans redémarrer.
 
+### Éditeur de touches
+
+L'onglet **Touches** de la fenêtre de personnalisation change la forme des
+touches : **Arrondie**, **Carrée**, **Ronde**, **Pilule**, **Hexagone**,
+**Losange**, **Fleur** ou **Étoile**. Les vignettes montrent chaque forme sur
+un fond de panneau, comme dans l'overlay.
+
+- **Forme par défaut** s'applique à toutes les touches qui n'ont pas
+exception ; le changement se voit immédiatement dans l'aperçu.
+- **Forme à appliquer** est le pinceau : choisissez une forme, puis cliquez
+une touche de la grille pour la lui donner (une fleur pour le A, une étoile
+pour Entrée…). Les touches personnalisées sont entourées de la couleur
+d'accent.
+- **Appliquer à toutes** impose la forme du pinceau au clavier entier et
+efface les exceptions ; **Effacer les exceptions** garde la forme par défaut
+et rend aux touches leur dessin commun.
+
+Les formes sont conservées dans `key_shape` (forme par défaut) et `key_shapes`
+(exceptions, indexées par l'étiquette de la touche) :
+
+```json
+{
+  "key_shape": "rounded",
+  "key_shapes": {"A": "flower", "Entrée": "star", "Espace": "pill"}
+}
+```
+
+Le texte reste centré et n'est jamais coupé par la forme ; sur une étoile ou
+une fleur, il déborde donc légèrement des pointes, ce qui garde les touches
+lisibles.
+
 ### Personnaliser l'apparence
 
 Clic droit sur l'icône de notification → **Personnaliser l'overlay…** ouvre une
 fenêtre de réglages avec un aperçu en direct. Les réglages sont répartis en
-quatre onglets ; l'aperçu reste visible sous les onglets et les boutons
+cinq onglets ; l'aperçu reste visible sous les onglets et les boutons
 **Réinitialiser**, **Enregistrer** et **Annuler** restent en bas de la fenêtre,
 hors de tout défilement. Si l'écran est trop bas, chaque onglet défile à
 l'intérieur plutôt que d'allonger la fenêtre.
@@ -413,6 +444,8 @@ l'intérieur plutôt que d'allonger la fenêtre.
   pour rester cohérents.
 - **Mise en forme** : police, taille, opacité du fond, rayon des coins, marge
   avec le bord de l'écran et largeur maximale.
+- **Touches** : forme des touches, par défaut ou touche par touche (voir
+  l'éditeur de touches ci-dessus).
 - **Interface** : langue de l'interface (automatique, français ou anglais).
   Le changement s'applique dès l'enregistrement, sans redémarrer.
 - **Aperçu animé** : la démonstration rejoue en boucle une frappe et un clic
@@ -549,6 +582,8 @@ Le dossier qui contient le fichier doit donc être accessible en écriture.
   "show_mouse": true,
   "mouse_tracking": false,
   "cursor_style": "classic",
+  "key_shape": "rounded",
+  "key_shapes": {},
   "keyboard_scale": 1.0,
   "language": "auto",
   "concat_text": false,
@@ -627,6 +662,8 @@ deux formes cohabitent.
 | `show_mouse` | Afficher la souris à côté du clavier en mode `keyboard` (défaut `true`). |
 | `mouse_tracking` | Pastille près du curseur pour chaque clic et cran de molette, au lieu des lignes correspondantes dans la bulle (défaut `false`). |
 | `cursor_style` | Cadre de l'indicateur près du curseur : `classic` (accent plein), `outline` (fond du panneau, trait d'accent) ou `keycap` (touche de clavier). Défaut `classic`. |
+| `key_shape` | Forme des touches du clavier complet : `rounded`, `square`, `circle`, `pill`, `hexagon`, `diamond`, `flower` ou `star`. Défaut `rounded`. |
+| `key_shapes` | Formes propres à certaines touches, indexées par leur étiquette, par exemple `{"A": "flower", "Entrée": "star"}`. Les autres gardent `key_shape`. |
 | `keyboard_scale` | Taille du clavier et de la souris, de `0.6` à `2.0` (défaut `1.0`), réglée avec la poignée de la bulle. |
 | `free_position` | Position libre enregistrée après un glisser, sous la forme `[x, y, largeur, hauteur]`. `null` = aucun déplacement manuel mémorisé. |
 | `language` | Langue de l'interface : `auto` (défaut, locale du système), `fr` ou `en`. |

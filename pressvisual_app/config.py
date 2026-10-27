@@ -17,6 +17,7 @@ from .i18n import LANGUAGE_AUTO, SUPPORTED_LANGUAGES, _t
 from .keymap import (
     CURSOR_STYLES,
     DISPLAY_MODES,
+    KEY_SHAPES,
     KEYBOARD_LAYOUTS,
     MOUSE_STYLES,
     POSITION_CHOICES,
@@ -53,6 +54,8 @@ APPEARANCE_CONFIG_KEYS: tuple[str, ...] = (
     "show_mouse",
     "mouse_tracking",
     "cursor_style",
+    "key_shape",
+    "key_shapes",
     "transition",
     "transition_out_ms",
 )
@@ -100,6 +103,12 @@ class Config:
     #: Dessin de cette pastille : classic (pastille d'accent), outline (fond
     #: du panneau et trait d'accent), keycap (touche de clavier).
     cursor_style: str = "classic"
+    #: Forme des touches du clavier complet : rounded, square, circle, pill,
+    #: hexagon, diamond, flower ou star.
+    key_shape: str = "rounded"
+    #: Formes propres à certaines touches, indexées par leur étiquette (``A``,
+    #: ``Espace``…) ; les autres gardent ``key_shape``.
+    key_shapes: dict[str, str] = field(default_factory=dict)
     keyboard_scale: float = 1.0        # taille du clavier, réglée à la souris
     #: Transition de la bulle (apparition et disparition) : fade (fondu),
     #: slide / slide-up / slide-left / slide-right (glissements), zoom
@@ -157,6 +166,11 @@ class Config:
     path: Optional[Path] = field(
         default=None, repr=False, compare=False, init=False
     )
+
+    # ------------------------------------------------------------------
+    def shape_for(self, label: str) -> str:
+        """Forme d'une touche : son exception, sinon la forme par défaut."""
+        return self.key_shapes.get(label, self.key_shape)
 
     # ------------------------------------------------------------------
     @classmethod
@@ -329,6 +343,17 @@ class Config:
             )
             cursor_style = "classic"
         self.cursor_style = cursor_style
+
+        shape = str(self.key_shape or "rounded").strip().lower()
+        if shape not in KEY_SHAPES:
+            notes.append(
+                _t("key_shape inconnu ({value}) : « rounded » utilisé.").format(
+                    value=repr(self.key_shape)
+                )
+            )
+            shape = "rounded"
+        self.key_shape = shape
+        self.key_shapes = _clean_key_shapes(self.key_shapes, notes)
 
         self.language = str(self.language or LANGUAGE_AUTO).strip().lower()
         if self.language not in (LANGUAGE_AUTO, *SUPPORTED_LANGUAGES):
@@ -515,6 +540,29 @@ def _as_bool(value: object, default: bool) -> bool:
     if isinstance(value, (int, float)):
         return bool(value)
     return default
+
+
+def _clean_key_shapes(value: object, notes: list[str]) -> dict[str, str]:
+    """Formes par touche, en ignorant ce qui n'est pas une forme connue.
+
+    Une entrée invalide n'empêche pas les autres : la forme par défaut prend
+    le relais pour la touche concernée.
+    """
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        notes.append(
+            _t("key_shapes ignoré : un objet {touche: forme} est attendu.")
+        )
+        return {}
+    cleaned: dict[str, str] = {}
+    for label, shape in value.items():
+        name = str(shape or "").strip().lower()
+        key = str(label or "").strip()
+        if not key or name not in KEY_SHAPES:
+            continue
+        cleaned[key] = name
+    return cleaned
 
 
 def _color_to_text(color: QColor) -> str:

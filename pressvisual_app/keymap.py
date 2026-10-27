@@ -50,6 +50,29 @@ CURSOR_STYLE_LABELS: dict[str, str] = {
     "keycap": "Touche",
 }
 
+#: Formes proposées pour les touches du clavier complet.
+KEY_SHAPES: tuple[str, ...] = (
+    "rounded",
+    "square",
+    "circle",
+    "pill",
+    "hexagon",
+    "diamond",
+    "flower",
+    "star",
+)
+
+KEY_SHAPE_LABELS: dict[str, str] = {
+    "rounded": "Arrondie",
+    "square": "Carrée",
+    "circle": "Ronde",
+    "pill": "Pilule",
+    "hexagon": "Hexagone",
+    "diamond": "Losange",
+    "flower": "Fleur",
+    "star": "Étoile",
+}
+
 #: Transitions de la bulle, utilisées à l'apparition comme à la disparition.
 TRANSITIONS: tuple[str, ...] = (
     "fade",

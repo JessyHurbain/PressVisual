@@ -73,10 +73,13 @@ from .keyboard import (
     KeyboardView,
     layout_for,
 )
+from .keyeditor import KeyPatch, KeyShapeEditor
 from .keymap import (
     CURSOR_STYLE_LABELS,
     CURSOR_STYLES,
     DISPLAY_MODES,
+    KEY_SHAPE_LABELS,
+    KEY_SHAPES,
     KEYBOARD_LAYOUTS,
     MODIFIER_ALIASES,
     MODIFIER_KEYS,
@@ -134,6 +137,10 @@ __all__ = [
     "InputView",
     "KEYBOARD_MAX_LIT",
     "KEYBOARD_LAYOUTS",
+    "KEY_SHAPE_LABELS",
+    "KEY_SHAPES",
+    "KeyPatch",
+    "KeyShapeEditor",
     "KEYBOARD_SCALE_MAX",
     "KEYBOARD_SCALE_MIN",
     "LAYOUTS",
