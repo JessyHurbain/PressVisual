@@ -1,16 +1,22 @@
-"""Tracés des formes de touches du clavier complet.
+"""Tracés des formes de touches du clavier et des pastilles de l'overlay.
 
 Chaque forme est un ``QPainterPath`` ajusté au rectangle de la touche, pour
 que le dessin, l'aperçu et l'éditeur partagent la même géométrie. Les formes
 sont volontairement simples : elles doivent rester lisibles à la taille d'une
 touche et laisser la place à son étiquette.
+
+Une touche large (une pastille de la bulle, la barre d'espace) ne peut pas
+recevoir la même silhouette qu'une touche carrée : une fleur ou une étoile
+inscrite dans un rectangle très allongé n'aurait plus de place au centre pour
+le texte. Ces formes deviennent alors une bande festonnée, qui garde le même
+dessin d'un bout à l'autre et laisse l'étiquette au milieu.
 """
 
 from __future__ import annotations
 
 import math
 
-from PyQt6.QtCore import QRectF
+from PyQt6.QtCore import QPointF, QRectF
 from PyQt6.QtGui import QPainterPath
 
 from .keymap import KEY_SHAPES
@@ -28,6 +34,27 @@ STAR_BRANCHES = 5
 STAR_INNER = 0.42
 #: Points d'échantillonnage des formes courbes (fleur, étoile).
 SAMPLES = 96
+
+#: Allongement au-delà duquel une forme radiale devient une bande : une
+#: pastille de bulle est deux à quatre fois plus large que haute.
+BANNER_ASPECT = 1.6
+#: Profondeur des festons d'une bande, en fraction de sa hauteur : une
+#: pastille de bulle est basse, ses festons doivent rester modestes pour
+#: laisser la place à l'étiquette.
+BANNER_DEPTH = 0.17
+#: Longueur d'un feston, en hauteurs : plus la bande est large, plus elle en
+#: porte, pour garder le même rythme qu'une touche carrée.
+BANNER_TOOTH = 2.2
+#: Nombre de festons d'une bande.
+BANNER_MIN_LOBES = 6
+BANNER_MAX_LOBES = 16
+#: Points d'échantillonnage du contour d'une bande.
+BANNER_SAMPLES = 320
+
+
+def _aspect(rect: QRectF) -> float:
+    """Allongement du rectangle (1 = carré, 2 = deux fois plus large)."""
+    return rect.width() / max(1.0, rect.height())
 
 
 def _add_flower(path: QPainterPath, rect: QRectF) -> None:
@@ -72,6 +99,117 @@ def _add_star(path: QPainterPath, rect: QRectF) -> None:
     path.closeSubpath()
 
 
+def _add_hexagon(path: QPainterPath, rect: QRectF) -> None:
+    """Bande à pointes : les coins sont coupés en biais."""
+    cut = min(rect.height() / 2.0, rect.width() / 3.0)
+    center_y = rect.center().y()
+    path.moveTo(rect.left(), center_y)
+    path.lineTo(rect.left() + cut, rect.top())
+    path.lineTo(rect.right() - cut, rect.top())
+    path.lineTo(rect.right(), center_y)
+    path.lineTo(rect.right() - cut, rect.bottom())
+    path.lineTo(rect.left() + cut, rect.bottom())
+    path.closeSubpath()
+
+
+def _add_diamond(path: QPainterPath, rect: QRectF) -> None:
+    """Losange : les quatre coins du rectangle deviennent des pointes."""
+    path.moveTo(rect.center().x(), rect.top())
+    path.lineTo(rect.right(), rect.center().y())
+    path.lineTo(rect.center().x(), rect.bottom())
+    path.lineTo(rect.left(), rect.center().y())
+    path.closeSubpath()
+
+
+def _rounded_outline(
+    width: float, height: float, radius: float, progress: float
+) -> tuple[QPointF, QPointF]:
+    """Point et normale sortante du contour d'un rectangle arrondi.
+
+    ``progress`` vaut 0 au début du côté haut et parcourt le contour dans le
+    sens des aiguilles d'une montre ; le point est centré sur l'origine.
+    """
+    straight_w = max(0.0, width - 2.0 * radius)
+    straight_h = max(0.0, height - 2.0 * radius)
+    arc = math.pi * radius / 2.0
+    total = 2.0 * straight_w + 2.0 * straight_h + 4.0 * arc
+    if total <= 0.0:
+        return QPointF(0.0, 0.0), QPointF(0.0, -1.0)
+    left, top = -width / 2.0, -height / 2.0
+    right, bottom = width / 2.0, height / 2.0
+
+    # Côtés et coins, dans l'ordre du contour (sens des aiguilles d'une
+    # montre en coordonnées écran, où l'axe y descend).
+    edges = (
+        (straight_w, left + radius, top, 1.0, 0.0, QPointF(0.0, -1.0)),
+        (straight_h, right, top + radius, 0.0, 1.0, QPointF(1.0, 0.0)),
+        (straight_w, right - radius, bottom, -1.0, 0.0, QPointF(0.0, 1.0)),
+        (straight_h, left, bottom - radius, 0.0, -1.0, QPointF(-1.0, 0.0)),
+    )
+    corners = (
+        (right - radius, top + radius, -math.pi / 2.0),
+        (right - radius, bottom - radius, 0.0),
+        (left + radius, bottom - radius, math.pi / 2.0),
+        (left + radius, top + radius, math.pi),
+    )
+
+    distance = (progress % 1.0) * total
+    for index, (length, start_x, start_y, dx, dy, normal) in enumerate(edges):
+        if distance <= length:
+            return QPointF(start_x + dx * distance, start_y + dy * distance), normal
+        distance -= length
+        centre_x, centre_y, angle = corners[index]
+        if distance <= arc:
+            angle += (distance / arc) * (math.pi / 2.0)
+            return (
+                QPointF(
+                    centre_x + radius * math.cos(angle),
+                    centre_y + radius * math.sin(angle),
+                ),
+                QPointF(math.cos(angle), math.sin(angle)),
+            )
+        distance -= arc
+    return QPointF(left + radius, top), QPointF(0.0, -1.0)
+
+
+def _add_banner(path: QPainterPath, rect: QRectF, sharp: bool) -> None:
+    """Bande festonnée : contour ondulé autour d'un rectangle arrondi.
+
+    Les festons ne sortent jamais du rectangle de base, qui garde toute la
+    place du texte : une étiquette n'est donc jamais coupée.
+    """
+    depth = rect.height() * BANNER_DEPTH
+    inner = QRectF(rect).adjusted(depth, depth, -depth, -depth)
+    if inner.width() <= 2.0 or inner.height() <= 2.0:
+        inner = QRectF(rect)
+        depth = 0.0
+    radius = min(inner.width(), inner.height()) * 0.42
+    lobes = int(round(rect.width() / (BANNER_TOOTH * max(1.0, rect.height()))))
+    lobes = max(BANNER_MIN_LOBES, min(BANNER_MAX_LOBES, lobes))
+    center = rect.center()
+
+    for index in range(BANNER_SAMPLES):
+        progress = index / BANNER_SAMPLES
+        point, normal = _rounded_outline(
+            inner.width(), inner.height(), radius, progress
+        )
+        wave = math.cos(2.0 * math.pi * lobes * progress)
+        # Une fleur arrondit ses pétales, une étoile les pointe : la base du
+        # feston reste la même dans les deux cas.
+        if sharp:
+            # Onde triangulaire : des pointes franches plutôt que des bosses.
+            bump = 1.0 - 2.0 * abs((lobes * progress + 0.5) % 1.0 - 0.5)
+        else:
+            bump = 0.5 + 0.5 * wave
+        x = center.x() + point.x() + normal.x() * depth * bump
+        y = center.y() + point.y() + normal.y() * depth * bump
+        if index == 0:
+            path.moveTo(x, y)
+        else:
+            path.lineTo(x, y)
+    path.closeSubpath()
+
+
 def key_shape_path(shape: str, rect: QRectF) -> QPainterPath:
     """Chemin de la touche ``shape`` dans ``rect``.
 
@@ -81,6 +219,7 @@ def key_shape_path(shape: str, rect: QRectF) -> QPainterPath:
     inner = QRectF(rect).adjusted(INSET, INSET, -INSET, -INSET)
     if inner.width() <= 2.0 or inner.height() <= 2.0:
         inner = QRectF(rect)
+    wide = _aspect(inner) > BANNER_ASPECT
 
     path = QPainterPath()
     if name == "square":
@@ -92,25 +231,24 @@ def key_shape_path(shape: str, rect: QRectF) -> QPainterPath:
         radius = min(inner.width(), inner.height()) / 2.0
         path.addRoundedRect(inner, radius, radius)
     elif name == "hexagon":
-        cut = min(inner.height() / 2.0, inner.width() / 3.0)
-        center_y = inner.center().y()
-        path.moveTo(inner.left(), center_y)
-        path.lineTo(inner.left() + cut, inner.top())
-        path.lineTo(inner.right() - cut, inner.top())
-        path.lineTo(inner.right(), center_y)
-        path.lineTo(inner.right() - cut, inner.bottom())
-        path.lineTo(inner.left() + cut, inner.bottom())
-        path.closeSubpath()
+        _add_hexagon(path, inner)
     elif name == "diamond":
-        path.moveTo(inner.center().x(), inner.top())
-        path.lineTo(inner.right(), inner.center().y())
-        path.lineTo(inner.center().x(), inner.bottom())
-        path.lineTo(inner.left(), inner.center().y())
-        path.closeSubpath()
+        # Un losange étiré n'aurait plus de place au centre : ses pointes
+        # deviennent celles d'une bande.
+        if wide:
+            _add_hexagon(path, inner)
+        else:
+            _add_diamond(path, inner)
     elif name == "flower":
-        _add_flower(path, inner)
+        if wide:
+            _add_banner(path, inner, sharp=False)
+        else:
+            _add_flower(path, inner)
     elif name == "star":
-        _add_star(path, inner)
+        if wide:
+            _add_banner(path, inner, sharp=True)
+        else:
+            _add_star(path, inner)
     else:
         radius = max(3.0, min(6.0, inner.height() * 0.2))
         path.addRoundedRect(inner, radius, radius)

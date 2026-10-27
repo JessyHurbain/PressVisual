@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Optional
+from typing import Callable, Iterable, Optional
 
 from PyQt6.QtCore import QRectF, QSize, Qt
 from PyQt6.QtGui import QFont, QFontMetrics, QPainter, QPen
 from PyQt6.QtWidgets import QHBoxLayout, QSizePolicy, QWidget
 
+from .shapes import key_shape_path
 from .theme import Palette, _with_alpha
 
 
 class Badge(QWidget):
-    """Petite pastille arrondie affichant une touche, un modificateur, etc.
+    """Petite pastille affichant une touche, un modificateur, etc.
+
+    Les touches prennent la forme choisie dans l'éditeur ; les autres genres
+    gardent la pastille arrondie.
 
     Types disponibles :
       * ``key``    : touche principale (fond clair, texte sombre) ;
@@ -25,6 +29,18 @@ class Badge(QWidget):
 
     HEIGHT_PADDING = 12
     HORIZONTAL_PADDING = 11
+    #: Place horizontale supplémentaire que réclame chaque forme, en fraction
+    #: de la hauteur de la pastille : une étoile ou un losange laissent moins
+    #: de place à l'étiquette qu'un rectangle, il faut donc élargir le badge.
+    SHAPE_ROOM: dict[str, float] = {
+        "square": 0.12,
+        "pill": 0.06,
+        "hexagon": 0.28,
+        "circle": 0.34,
+        "flower": 0.34,
+        "star": 0.46,
+        "diamond": 0.68,
+    }
 
     def __init__(
         self,
@@ -33,6 +49,7 @@ class Badge(QWidget):
         font: QFont,
         palette: Palette,
         parent: Optional[QWidget] = None,
+        shape: str = "rounded",
     ) -> None:
         super().__init__(parent)
         self._label = label
@@ -41,10 +58,18 @@ class Badge(QWidget):
         self._metrics = QFontMetrics(self._font)
         self._palette = palette
         self._alpha = 1.0
+        # Seules les touches prennent une forme : un clic ou un texte saisi
+        # restent des pastilles, comme avant.
+        self._shape = shape if kind in ("key", "mod") else "rounded"
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
     # ------------------------------------------------------------------
+    @property
+    def shape(self) -> str:
+        """Forme de la pastille (``rounded`` pour tout ce qui n'est pas touche)."""
+        return self._shape
+
     def set_alpha(self, alpha: float) -> None:
         alpha = max(0.0, min(1.0, alpha))
         if abs(alpha - self._alpha) > 0.001:
@@ -62,7 +87,9 @@ class Badge(QWidget):
             return QSize(text_width + 16, height)
         if self._kind == "mouse":
             return QSize(12 + 6 + 7 + text_width + 12, height)
-        return QSize(text_width + 2 * self.HORIZONTAL_PADDING, height)
+        width = text_width + 2 * self.HORIZONTAL_PADDING
+        width += int(round(self.SHAPE_ROOM.get(self._shape, 0.0) * height))
+        return QSize(width, height)
 
     # ------------------------------------------------------------------
     def paintEvent(self, event) -> None:  # noqa: N802 - API Qt
@@ -119,7 +146,7 @@ class Badge(QWidget):
         if self._kind == "mod":
             painter.setBrush(_with_alpha(self._palette.mod_bg, alpha))
             painter.setPen(QPen(_with_alpha(self._palette.mod_border, alpha), 1.0))
-            painter.drawRoundedRect(rect, radius, radius)
+            painter.drawPath(key_shape_path(self._shape, rect))
             painter.setPen(_with_alpha(self._palette.text, alpha))
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self._label)
             return
@@ -127,7 +154,7 @@ class Badge(QWidget):
         # Touche principale : pastille claire, texte sombre.
         painter.setBrush(_with_alpha(self._palette.key_bg, alpha))
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRoundedRect(rect, radius, radius)
+        painter.drawPath(key_shape_path(self._shape, rect))
         painter.setPen(_with_alpha(self._palette.key_text, alpha))
         painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self._label)
 
@@ -140,10 +167,12 @@ class KeyRow(QWidget):
         font: QFont,
         palette: Palette,
         parent: Optional[QWidget] = None,
+        shape_for: Optional[Callable[[str], str]] = None,
     ) -> None:
         super().__init__(parent)
         self._font = QFont(font)
         self._palette = palette
+        self._shape_for = shape_for
         self._items: list[tuple[str, str]] = []
         self._badges: list[Badge] = []
         self._alpha = 1.0
@@ -176,7 +205,12 @@ class KeyRow(QWidget):
         self._badges.clear()
 
         for label, kind in self._items:
-            badge = Badge(label, kind, self._font, self._palette, parent=self)
+            shape = "rounded"
+            if self._shape_for is not None and kind in ("key", "mod"):
+                shape = self._shape_for(label)
+            badge = Badge(
+                label, kind, self._font, self._palette, parent=self, shape=shape
+            )
             badge.set_alpha(self._alpha)
             self._layout.addWidget(badge)
             self._badges.append(badge)
@@ -188,4 +222,3 @@ class KeyRow(QWidget):
         self._alpha = alpha
         for badge in self._badges:
             badge.set_alpha(alpha)
-

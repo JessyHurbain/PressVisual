@@ -67,6 +67,7 @@ from .keymap import (
     MOUSE_STYLES,
     TRANSITION_LABELS,
     TRANSITIONS,
+    key_shape_for,
     modifier_side_token,
     transition_geometry,
 )
@@ -294,7 +295,9 @@ class PreviewPanel(QWidget):
         # Démonstration animée : une pastille dont le contenu change pour
         # montrer une frappe puis un clic dans le mode standard. Elle est
         # placée en tête pour rester visible sans faire défiler l'aperçu.
-        self._demo_row = KeyRow(font, self._palette, self._surface)
+        self._demo_row = KeyRow(
+            font, self._palette, self._surface, shape_for=self._shape_for
+        )
         self._layout.addWidget(self._demo_row)
 
         self._rows: list[KeyRow] = []
@@ -305,7 +308,9 @@ class PreviewPanel(QWidget):
             ((_t("bonjour"), "text"),),
         )
         for items in samples:
-            row = KeyRow(font, self._palette, self._surface)
+            row = KeyRow(
+                font, self._palette, self._surface, shape_for=self._shape_for
+            )
             row.set_items(items)
             self._layout.addWidget(row)
             self._rows.append(row)
@@ -412,6 +417,10 @@ class PreviewPanel(QWidget):
         self.setMinimumSize(minimum.width(), max(180, minimum.height()))
 
     # ------------------------------------------------------------------
+    def _shape_for(self, label: str) -> str:
+        """Forme d'une touche de la bulle, lue dans la configuration courante."""
+        return key_shape_for(self._config, label)
+
     def update_appearance(self, config: Config, font_family: str) -> None:
         self._config = config
         self._palette.update_from_config(config)

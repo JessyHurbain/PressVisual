@@ -52,6 +52,7 @@ from .keymap import (
     POSITION_LABELS,
     SLIDE_DIRECTIONS,
     key_label,
+    key_shape_for,
     modifier_label,
     should_use_combo,
     transition_geometry,
@@ -943,7 +944,15 @@ class Overlay(QWidget):
     # Lignes de l'overlay
     # ------------------------------------------------------------------
     def _new_row(self, items: Iterable[tuple[str, str]]) -> KeyRow:
-        row = KeyRow(self._badge_font, self._palette, self)
+        row = KeyRow(
+            self._badge_font,
+            self._palette,
+            self,
+            # La bulle suit les formes de l'éditeur de touches ; la règle est
+            # relue à chaque badge pour qu'un réglage s'applique sans
+            # reconstruire les lignes.
+            shape_for=lambda label: key_shape_for(self._cfg, label),
+        )
         row.set_items(items)
         self._rows.append(row)
         self._layout.addWidget(row)

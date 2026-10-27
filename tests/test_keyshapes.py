@@ -1,10 +1,10 @@
-"""Formes de touches : tracés, configuration, clavier et éditeur."""
+"""Formes de touches : tracés, configuration, clavier, bulles et éditeur."""
 
 from __future__ import annotations
 
 import json
 
-from PyQt6.QtCore import QRectF
+from PyQt6.QtCore import QPointF, QRectF
 from PyQt6.QtGui import QFont
 
 import pressvisual
@@ -106,6 +106,15 @@ def test_default_shape_is_rounded():
     assert pressvisual.Config().shape_for("A") == "rounded"
 
 
+def test_shape_lookup_ignores_case():
+    config = pressvisual.Config(key_shapes={"é": "flower", "A": "star"})
+
+    # La bulle affiche « É » quand la disposition nomme la touche « é ».
+    assert config.shape_for("É") == "flower"
+    assert config.shape_for("a") == "star"
+    assert config.shape_for("Z") == "rounded"
+
+
 # ---------------------------------------------------------------------------
 # Clavier
 # ---------------------------------------------------------------------------
@@ -140,6 +149,97 @@ def test_keyboard_shape_can_be_set_per_key(qapp):
     finally:
         plain.deleteLater()
         mixed.deleteLater()
+
+
+# ---------------------------------------------------------------------------
+# Formes larges
+# ---------------------------------------------------------------------------
+
+
+def test_wide_shape_still_fills_its_rect():
+    rect = QRectF(0, 0, 88, 30)
+
+    for shape in ("flower", "star", "diamond"):
+        path = key_shape_path(shape, rect)
+        bounds = path.boundingRect()
+
+        assert bounds.width() > rect.width() * 0.85, shape
+        assert bounds.height() > rect.height() * 0.9, shape
+
+
+def test_wide_shape_leaves_room_for_the_label():
+    # Une pastille garde une bande centrale pleine : l'étiquette n'est jamais
+    # coupée par un creux, même sur une fleur ou une étoile.
+    rect = QRectF(0, 0, 88, 30)
+    centre = rect.center()
+    # Une bande de la largeur d'une étiquette (« Entrée » fait 56 px).
+    band = QRectF(centre.x() - 26.0, centre.y() - 6.0, 52.0, 12.0)
+
+    for shape in pressvisual.KEY_SHAPES:
+        assert key_shape_path(shape, rect).contains(band), shape
+
+
+def test_wide_diamond_keeps_its_points():
+    rect = QRectF(0, 0, 88, 30)
+    path = key_shape_path("diamond", rect)
+
+    # Un losange étiré n'aurait plus de place au centre : ses coins gauches
+    # et droits restent des pointes, le haut et le bas s'aplatissent.
+    assert path.contains(rect.center() - QPointF(rect.width() / 2 - 6, 0))
+    assert not path.contains(QPointF(rect.left() + 4, rect.top() + 4))
+
+
+# ---------------------------------------------------------------------------
+# Bulles
+# ---------------------------------------------------------------------------
+
+
+def test_bubble_keys_take_the_configured_shape(qapp, overlay):
+    overlay._cfg.key_shape = "flower"
+
+    row = overlay._new_row([("A", "key")])
+
+    assert [badge.shape for badge in row._badges] == ["flower"]
+
+
+def test_bubble_shapes_can_be_set_per_key(qapp, overlay):
+    overlay._cfg.key_shape = "rounded"
+    overlay._cfg.key_shapes = {"A": "star", "Ctrl": "pill"}
+
+    row = overlay._new_row([("Ctrl", "mod"), ("+", "plus"), ("A", "key")])
+
+    assert [badge.shape for badge in row._badges] == ["pill", "rounded", "star"]
+
+
+def test_bubble_leaves_clicks_and_typed_text_rounded(qapp, overlay):
+    overlay._cfg.key_shape = "star"
+
+    row = overlay._new_row([("Clic gauche", "mouse"), ("bonjour", "text")])
+
+    assert [badge.shape for badge in row._badges] == ["rounded", "rounded"]
+
+
+def test_bubble_shapes_follow_a_saved_setting(qapp, overlay):
+    row = overlay._new_row([("A", "key")])
+
+    overlay.apply_appearance({"key_shape": "star"})
+
+    assert row._badges[0].shape == "star"
+
+
+def test_preview_bubbles_follow_the_shape(qapp, config):
+    config.key_shape = "pill"
+    config.key_shapes = {"C": "flower"}
+    preview = pressvisual.PreviewPanel(config, "DejaVu Sans")
+    try:
+        shapes = [
+            badge.shape for row in preview._rows for badge in row._badges
+        ]
+
+        assert "pill" in shapes
+        assert "flower" in shapes
+    finally:
+        preview.deleteLater()
 
 
 # ---------------------------------------------------------------------------

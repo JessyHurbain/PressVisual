@@ -169,8 +169,18 @@ class Config:
 
     # ------------------------------------------------------------------
     def shape_for(self, label: str) -> str:
-        """Forme d'une touche : son exception, sinon la forme par défaut."""
-        return self.key_shapes.get(label, self.key_shape)
+        """Forme d'une touche : son exception, sinon la forme par défaut.
+
+        La comparaison ignore la casse : la bulle affiche « É » quand la
+        disposition nomme la touche « é ».
+        """
+        if label in self.key_shapes:
+            return self.key_shapes[label]
+        folded = str(label).casefold()
+        for known, shape in self.key_shapes.items():
+            if known.casefold() == folded:
+                return shape
+        return self.key_shape
 
     # ------------------------------------------------------------------
     @classmethod

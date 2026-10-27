@@ -10,6 +10,7 @@ import pytest
 
 import pressvisual
 from pressvisual_app import i18n as pv_i18n
+from pressvisual_app.keymap import key_shape_for
 from tools import compile_translations
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -214,6 +215,16 @@ def test_display_settings_are_translated(english, qapp, config):
         )
     finally:
         dialog.deleteLater()
+
+
+def test_key_shape_follows_the_translated_modifier(english, qapp, config):
+    # L'éditeur nomme la touche « Maj » comme le clavier ; la bulle affiche
+    # « Shift ». La forme choisie doit valoir pour les deux.
+    config.key_shapes = {"Maj": "flower"}
+
+    assert key_shape_for(config, "Shift") == "flower"
+    assert key_shape_for(config, "Maj") == "flower"
+    assert key_shape_for(config, "Ctrl") == "rounded"
 
 
 def test_tray_menu_is_translated(english, qapp, overlay, config):

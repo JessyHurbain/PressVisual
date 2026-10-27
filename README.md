@@ -417,9 +417,16 @@ Les formes sont conservées dans `key_shape` (forme par défaut) et `key_shapes`
 }
 ```
 
-Le texte reste centré et n'est jamais coupé par la forme ; sur une étoile ou
-une fleur, il déborde donc légèrement des pointes, ce qui garde les touches
-lisibles.
+Les formes valent partout où des touches sont dessinées : le clavier complet
+**et** les pastilles de la bulle. Le texte reste centré. Sur une touche plus
+large que haute (une barre d'espace, une pastille « Entrée » ou « Ctrl »),
+une fleur ou une étoile deviendraient si étroites au centre que l'étiquette
+sortirait de la forme : elles deviennent alors une **bande festonnée**, même
+motif d'un bout à l'autre, qui garde l'étiquette au milieu. Un losange étiré
+devient de la même façon une bande à pointes.
+
+Les clics de souris et le texte saisi gardent leur pastille arrondie : la
+forme ne concerne que les touches.
 
 ### Personnaliser l'apparence
 
@@ -444,8 +451,8 @@ l'intérieur plutôt que d'allonger la fenêtre.
   pour rester cohérents.
 - **Mise en forme** : police, taille, opacité du fond, rayon des coins, marge
   avec le bord de l'écran et largeur maximale.
-- **Touches** : forme des touches, par défaut ou touche par touche (voir
-  l'éditeur de touches ci-dessus).
+- **Touches** : forme des touches du clavier et des pastilles, par défaut ou
+  touche par touche (voir l'éditeur de touches ci-dessus).
 - **Interface** : langue de l'interface (automatique, français ou anglais).
   Le changement s'applique dès l'enregistrement, sans redémarrer.
 - **Aperçu animé** : la démonstration rejoue en boucle une frappe et un clic

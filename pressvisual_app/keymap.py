@@ -275,6 +275,25 @@ def key_label(config: Config, token: str) -> str:
     return token.capitalize()
 
 
+def shape_label(config: Config, label: str) -> str:
+    """Étiquette d'une touche ramenée à celle de la disposition.
+
+    La bulle affiche les modificateurs traduits (« Shift » en anglais) alors
+    que l'éditeur les nomme comme le clavier (« Maj ») : la forme choisie
+    pour l'un doit suivre l'autre.
+    """
+    for field_name in ("ctrl_label", "alt_label", "shift_label", "win_label"):
+        raw = str(getattr(config, field_name, "") or "")
+        if raw and label != raw and label == _t(raw):
+            return raw
+    return label
+
+
+def key_shape_for(config: Config, label: str) -> str:
+    """Forme d'une touche d'après son étiquette affichée."""
+    return config.shape_for(shape_label(config, label))
+
+
 def describe_hotkey(config: Config, spec: str) -> str:
     """Raccourci sous forme lisible (pour les menus), ou ``""``."""
     parsed = parse_hotkey(spec)
