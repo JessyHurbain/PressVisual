@@ -30,6 +30,10 @@ MOUSE_BUTTONS: tuple[str, ...] = ("left", "right", "middle", "back", "forward")
 #: Dessin utilisé quand la configuration n'en donne pas (ou un inconnu).
 DEFAULT_MOUSE_STYLE = "classic"
 
+#: Hauteur minimale d'un schéma de souris (px). Les pastilles du curseur en
+#: dessinent une version réduite, le clavier une version alignée sur ses touches.
+MIN_MOUSE_HEIGHT = 32
+
 
 def _normalize_style(style: str) -> str:
     """Nom de dessin valide, ou « classic »."""
@@ -51,10 +55,14 @@ class MouseView(QWidget):
         palette: Palette,
         parent: Optional[QWidget] = None,
         style: str = DEFAULT_MOUSE_STYLE,
+        strokes: float = 1.0,
     ) -> None:
         super().__init__(parent)
         self._palette = palette
         self._style = _normalize_style(style)
+        #: Multiplicateur d'opacité des traits. Une pastille réduite près du
+        #: curseur en a besoin pour rester lisible ; le clavier garde 1.0.
+        self._strokes = max(0.2, min(2.0, float(strokes)))
         self._buttons: frozenset[str] = frozenset()
         self._scroll: Optional[tuple[str, int]] = None
         self._height = 150.0
@@ -116,9 +124,14 @@ class MouseView(QWidget):
     # ------------------------------------------------------------------
     # Dimensions
     # ------------------------------------------------------------------
+    def set_palette(self, palette: Palette) -> None:
+        """Remplace la palette : la pastille du curseur en dérive une."""
+        self._palette = palette
+        self.update()
+
     def set_height(self, height: float) -> None:
-        """Aligne la souris sur la hauteur du clavier."""
-        height = max(60.0, float(height))
+        """Aligne la souris sur la hauteur du clavier, ou la réduit."""
+        height = max(float(MIN_MOUSE_HEIGHT), float(height))
         if height == self._height:
             return
         self._height = height
@@ -166,14 +179,18 @@ class MouseView(QWidget):
             # texte du panneau : le texte des touches serait illisible sur le
             # fond sombre de la bulle.
             painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.setPen(QPen(_with_alpha(self._palette.text, 0.55), 1.0))
+            painter.setPen(
+                QPen(_with_alpha(self._palette.text, 0.55 * self._strokes), 1.0)
+            )
         else:
             painter.setBrush(
-                _with_alpha(self._palette.key_text, 0.07)
+                _with_alpha(self._palette.key_text, 0.07 * self._strokes)
                 if self._palette.key_bg.lightness() > 128
                 else Qt.BrushStyle.NoBrush
             )
-            painter.setPen(QPen(_with_alpha(self._palette.key_text, 0.30), 1.0))
+            painter.setPen(
+                QPen(_with_alpha(self._palette.key_text, 0.30 * self._strokes), 1.0)
+            )
         painter.drawRoundedRect(rect, corner, corner)
 
     def _paint_scroll(
@@ -288,7 +305,9 @@ class MouseView(QWidget):
             # La molette reste dessinée au repos : c'est elle qui fait lire la
             # silhouette comme une souris.
             painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.setPen(QPen(_with_alpha(self._palette.text, 0.40), 1.0))
+            painter.setPen(
+                QPen(_with_alpha(self._palette.text, 0.40 * self._strokes), 1.0)
+            )
             painter.drawRoundedRect(wheel, wheel_width / 2.0, wheel_width / 2.0)
         if self._scroll is not None:
             axis, direction = self._scroll
@@ -297,10 +316,10 @@ class MouseView(QWidget):
         painter.setClipping(False)
         painter.setBrush(Qt.BrushStyle.NoBrush)
         if self._style == "outline":
-            border = _with_alpha(self._palette.text, 0.60)
+            border = _with_alpha(self._palette.text, 0.60 * self._strokes)
         elif self._style == "minimal":
-            border = _with_alpha(self._palette.text, 0.40)
+            border = _with_alpha(self._palette.text, 0.40 * self._strokes)
         else:
-            border = _with_alpha(self._palette.key_text, 0.30)
+            border = _with_alpha(self._palette.key_text, 0.30 * self._strokes)
         painter.setPen(QPen(border, 1.0))
         painter.drawPath(outline)

@@ -249,6 +249,7 @@ class Overlay(QWidget):
         if self._cursor_badge is not None:
             self._cursor_badge.set_palette(self._palette)
             self._cursor_badge.set_style(self._cfg.cursor_style)
+            self._cursor_badge.set_mouse_style(self._cfg.mouse_style)
             self._cursor_badge.set_font(self._badge_font)
             if not self._cfg.mouse_tracking:
                 self._cursor_badge.hide_badge()
@@ -1274,26 +1275,32 @@ class Overlay(QWidget):
         """Pastille du curseur, créée au premier clic affiché."""
         if self._cursor_badge is None:
             self._cursor_badge = CursorBadge(
-                self._palette, self._badge_font, self._cfg.cursor_style
+                self._palette,
+                self._badge_font,
+                self._cfg.cursor_style,
+                self._cfg.mouse_style,
             )
         return self._cursor_badge
 
     def _show_cursor_event(self, event: MouseEvent) -> None:
-        """Affiche près du pointeur le clic ou le cran de molette."""
+        """Allume près du pointeur le bouton ou le cran qui vient d'agir.
+
+        La pastille dessine une souris : elle n'a besoin que du geste et des
+        modificateurs tenus, pas du libellé de la bulle.
+        """
         mods = tuple(m for m in MODIFIER_ORDER if m in set(event.mods))
+        chips = [modifier_label(self._cfg, name) for name in mods]
+        badge = self._cursor_indicator()
         if event.kind == "scroll":
             axis = event.axis or "vertical"
-            label = self._scroll_label(axis, 1 if event.direction >= 0 else -1)
-        else:
-            label = self._click_label(event)
-        # Les séparateurs « + » de la bulle sont reconstruits ici : la
-        # pastille n'affiche que les libellés.
-        parts = [
-            part
-            for part, kind in self._mouse_items(mods, label)
-            if kind != "plus"
-        ]
-        self._cursor_indicator().show_label(" + ".join(parts))
+            direction = 1 if event.direction >= 0 else -1
+            badge.show_event(scroll=(axis, direction), chips=tuple(chips))
+            return
+
+        button = event.button or "left"
+        if button == "left" and event.count >= 2:
+            chips.append(f"×{event.count}")
+        badge.show_event(button=button, chips=tuple(chips))
 
     # ------------------------------------------------------------------
     # Souris du mode clavier

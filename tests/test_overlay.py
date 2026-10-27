@@ -341,13 +341,35 @@ def test_mouse_tracking_shows_clicks_next_to_the_cursor(overlay, config):
 
         assert items(overlay) == []
         assert overlay._cursor_badge is not None
-        assert overlay._cursor_badge.label == "Clic gauche"
+        assert overlay._cursor_badge.buttons == ("left",)
+        assert overlay._cursor_badge.chips == ()
         assert overlay._cursor_badge.isVisible()
     finally:
         overlay._cursor_badge.hide_badge()
 
 
-def test_mouse_tracking_labels_scroll_with_modifiers(overlay, config):
+def test_mouse_tracking_lights_the_clicked_button(overlay, config):
+    config.mouse_tracking = True
+    try:
+        overlay._on_mouse(MouseEvent(kind="click", button="right"))
+
+        assert overlay._cursor_badge.buttons == ("right",)
+    finally:
+        overlay._cursor_badge.hide_badge()
+
+
+def test_mouse_tracking_shows_a_double_click_as_a_count(overlay, config):
+    config.mouse_tracking = True
+    try:
+        overlay._on_mouse(MouseEvent(kind="click", button="left", count=2))
+
+        assert overlay._cursor_badge.buttons == ("left",)
+        assert overlay._cursor_badge.chips == ("×2",)
+    finally:
+        overlay._cursor_badge.hide_badge()
+
+
+def test_mouse_tracking_scrolls_with_modifiers(overlay, config):
     config.mouse_tracking = True
     try:
         overlay._on_mouse(
@@ -355,7 +377,8 @@ def test_mouse_tracking_labels_scroll_with_modifiers(overlay, config):
         )
 
         assert items(overlay) == []
-        assert overlay._cursor_badge.label == "Ctrl + Scroll ↑"
+        assert overlay._cursor_badge.scroll == ("vertical", 1)
+        assert overlay._cursor_badge.chips == ("Ctrl",)
     finally:
         overlay._cursor_badge.hide_badge()
 
@@ -370,15 +393,16 @@ def test_mouse_tracking_is_hidden_in_private_mode(overlay, config):
     assert not badge.isVisible()
 
 
-def test_cursor_badge_paints_its_label(qapp, overlay, config):
+def test_cursor_badge_paints_its_mouse(qapp, overlay, config):
     config.mouse_tracking = True
     badge = overlay._cursor_indicator()
     try:
-        badge.show_label("Ctrl + Clic gauche")
+        badge.show_event("left", None, ("Ctrl",))
         qapp.processEvents()
 
         assert badge.isVisible()
-        assert badge.width() > 60
+        assert badge.width() > 20
+        assert badge.height() > 40
         assert not badge.grab().isNull()
     finally:
         badge.hide_badge()
@@ -389,7 +413,7 @@ def test_cursor_badge_uses_the_configured_style(qapp, overlay, config):
     badge = overlay._cursor_indicator()
     try:
         assert badge.style == "keycap"
-        badge.show_label("Ctrl + Clic gauche")
+        badge.show_event("left", None, ("Ctrl",))
         qapp.processEvents()
 
         assert badge.isVisible()
@@ -405,6 +429,29 @@ def test_cursor_badge_follows_the_chosen_style(overlay, config):
 
         assert config.cursor_style == "outline"
         assert badge.style == "outline"
+    finally:
+        badge.hide_badge()
+
+
+def test_cursor_badge_shows_a_mouse_glyph(overlay):
+    badge = overlay._cursor_indicator()
+    try:
+        badge.show_event("right")
+
+        assert isinstance(badge._mouse, pressvisual.MouseView)
+        assert badge._mouse.active_buttons() == ["right"]
+        assert badge.height() < 80
+    finally:
+        badge.hide_badge()
+
+
+def test_cursor_badge_uses_the_mouse_design(overlay, config):
+    badge = overlay._cursor_indicator()
+    try:
+        overlay.apply_appearance({"mouse_style": "minimal"})
+
+        assert config.mouse_style == "minimal"
+        assert badge.mouse_style == "minimal"
     finally:
         badge.hide_badge()
 
