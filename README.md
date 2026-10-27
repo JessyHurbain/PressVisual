@@ -215,6 +215,17 @@ les autres versions de Python de la matrice ne sont pas reproduits ; le script
 annonce ce qu'il a utilisé. `SKIP_COVERAGE=1` saute la mesure de couverture et
 `PYTHON=/chemin/vers/python` impose un interpréteur.
 
+Pour ne plus y penser, le dépôt fournit un crochet `pre-push` versionné qui
+lance cette vérification et interrompt la poussée si elle échoue :
+
+```bash
+git config --local core.hooksPath tools/git-hooks
+```
+
+Le réglage est propre à votre clone. `git push --no-verify` pousse sans
+vérifier, et le crochet ne fait rien en intégration continue, où le workflow
+joue déjà les mêmes étapes.
+
 Les tests couvrent la configuration (chargement, validation, enregistrement),
 l'analyse des raccourcis et des touches, le fil de capture (modificateurs avec
 la souris, molette, double-clic), le rendu de l'overlay (combinaisons, texte
@@ -1173,7 +1184,8 @@ pressvisual_app/      Code de l'application
   diagnostics.py      Messages d'erreur et journal (exécutables sans console)
 translations/         Catalogues de traduction (.ts source, .qm compilé)
 tools/                Compilation des .ts en .qm, builds, captures du README,
-                      vérification dans les conditions de la CI
+                      vérification dans les conditions de la CI et crochet
+                      Git avant poussée (tools/git-hooks/pre-push)
 tests/                Suite de tests hors écran (pytest)
 docs/images/          Captures d'écran utilisées par ce README, générées par
                       tools/make_docs_images.py

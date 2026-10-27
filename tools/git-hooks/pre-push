@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Crochet Git « pre-push » : vérifie le dépôt avant d'envoyer des commits.
+#
+# Il est versionné ici, avec le reste des outils, et activé par :
+#   git config --local core.hooksPath tools/git-hooks
+# Le crochet profite alors à chaque clone qui pose ce réglage, et il suit les
+# évolutions du dépôt au lieu de vivre en copie dans .git/hooks, invisible.
+#
+# Pour pousser sans attendre : git push --no-verify
+
+set -euo pipefail
+
+# En intégration continue, le workflow Tests joue déjà ces étapes sur le commit
+# poussé : les refaire ici ne prouverait rien de plus.
+if [[ -n ${CI:-}${GITHUB_ACTIONS:-} ]]; then
+    exit 0
+fi
+
+# .git/hooks/pre-push → racine ; tools/git-hooks/pre-push → racine également.
+ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+
+printf '[crochet] vérification avant poussée (détail : tools/check_ci.sh)\n'
+if bash "$ROOT_DIR/tools/check_ci.sh"; then
+    exit 0
+fi
+
+printf '\n[crochet] la vérification a échoué : poussée interrompue.\n' >&2
+printf '[crochet] corriger, puis réessayer — ou forcer : git push --no-verify\n' >&2
+exit 1
