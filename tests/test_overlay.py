@@ -174,6 +174,50 @@ def test_zoom_animation_starts_small(overlay):
     assert overlay._rows[0]._zoom == 1.0
 
 
+def test_slide_animation_comes_from_the_left(overlay):
+    overlay._cfg.row_animation = "slide"
+
+    overlay._on_key(KeyEvent(token="a", char="a"))
+
+    row = overlay._rows[0]
+    assert row._offset[0] < 0
+    assert row._offset[1] == 0
+
+    finish_animation(overlay)
+
+    assert row._offset == (0.0, 0.0)
+
+
+def test_drop_animation_comes_from_above(overlay):
+    overlay._cfg.row_animation = "drop"
+
+    overlay._on_key(KeyEvent(token="a", char="a"))
+
+    row = overlay._rows[0]
+    assert row._offset[1] < 0
+    assert row._offset[0] == 0
+
+
+def test_bounce_animation_settles_on_the_final_size(overlay):
+    overlay._cfg.row_animation = "bounce"
+
+    overlay._on_key(KeyEvent(token="a", char="a"))
+
+    row = overlay._rows[0]
+    assert row._zoom < 1.0
+
+    finish_animation(overlay)
+
+    assert row._zoom == 1.0
+    assert row._appear == 1.0
+
+
+def test_bounce_curve_overshoots_its_target():
+    assert overlay_module._ease_out_back(1.0) == 1.0
+    # Passé les trois quarts du parcours, la valeur dépasse 1 avant de revenir.
+    assert overlay_module._ease_out_back(0.8) > 1.0
+
+
 def test_grow_animation_opens_the_row(overlay):
     overlay._cfg.row_animation = "grow"
 

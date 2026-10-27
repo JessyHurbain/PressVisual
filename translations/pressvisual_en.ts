@@ -568,6 +568,18 @@
         <translation>Unfold</translation>
     </message>
     <message>
+        <source>Rebond</source>
+        <translation>Bounce</translation>
+    </message>
+    <message>
+        <source>Glisser</source>
+        <translation>Slide</translation>
+    </message>
+    <message>
+        <source>Chute</source>
+        <translation>Drop</translation>
+    </message>
+    <message>
         <source>Aucune</source>
         <translation>None</translation>
     </message>

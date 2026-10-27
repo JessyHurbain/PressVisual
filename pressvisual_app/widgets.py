@@ -58,9 +58,12 @@ class Badge(QWidget):
         self._metrics = QFontMetrics(self._font)
         self._palette = palette
         self._alpha = 1.0
-        #: Avancement de l'apparition (0 = invisible) et échelle de « zoom ».
+        #: Avancement de l'apparition (0 = invisible), échelle de « zoom » et
+        #: décalage de peinture (glissement ou chute), en pixels.
         self._appear = 1.0
         self._zoom = 1.0
+        self._offset_x = 0.0
+        self._offset_y = 0.0
         # Seules les touches prennent une forme : un clic ou un texte saisi
         # restent des pastilles, comme avant.
         self._shape = shape if kind in ("key", "mod") else "rounded"
@@ -93,6 +96,13 @@ class Badge(QWidget):
             self._zoom = zoom
             self.update()
 
+    def set_offset(self, dx: float, dy: float) -> None:
+        """Décalage de peinture du contenu, pour les animations glissées."""
+        if abs(dx - self._offset_x) > 0.01 or abs(dy - self._offset_y) > 0.01:
+            self._offset_x = float(dx)
+            self._offset_y = float(dy)
+            self.update()
+
     def sizeHint(self) -> QSize:  # noqa: N802 - API Qt
         text_width = self._metrics.horizontalAdvance(self._label)
         height = max(self._metrics.height() + self.HEIGHT_PADDING, 30)
@@ -120,6 +130,8 @@ class Badge(QWidget):
         # L'animation d'apparition module l'opacité et, pour « zoom », la
         # taille du contenu : la place réservée dans la ligne ne bouge pas.
         alpha = self._alpha * self._appear
+        if self._offset_x or self._offset_y:
+            painter.translate(self._offset_x, self._offset_y)
         if self._zoom != 1.0:
             center = QRectF(self.rect()).center()
             painter.translate(center)
@@ -212,6 +224,7 @@ class KeyRow(QWidget):
         self._alpha = 1.0
         self._appear = 1.0
         self._zoom = 1.0
+        self._offset = (0.0, 0.0)
         self._layout = QHBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setSpacing(5)
@@ -273,6 +286,7 @@ class KeyRow(QWidget):
             badge.set_alpha(self._alpha)
             badge.set_appear(self._appear)
             badge.set_zoom(self._zoom)
+            badge.set_offset(*self._offset)
             self._layout.addWidget(badge)
             self._badges.append(badge)
 
@@ -295,3 +309,9 @@ class KeyRow(QWidget):
         self._zoom = max(0.1, min(1.5, float(zoom)))
         for badge in self._badges:
             badge.set_zoom(self._zoom)
+
+    def set_offset(self, dx: float, dy: float) -> None:
+        """Décale la peinture des badges, pour les animations glissées."""
+        self._offset = (float(dx), float(dy))
+        for badge in self._badges:
+            badge.set_offset(dx, dy)

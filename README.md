@@ -366,6 +366,12 @@ animation, choisie avec **Animation des lignes** (clé `row_animation`) :
 de 200 ms, sans déplacer les autres.
 - **Zoom** (`"zoom"`) : les pastilles grossissent depuis leur centre, de 70 % à
 leur taille normale, en apparaissant.
+- **Rebond** (`"bounce"`) : même départ que le zoom, mais la pastille dépasse
+légèrement sa taille avant de se poser.
+- **Glisser** (`"slide"`) : la ligne entre par la gauche, à quelques pixels
+près, en se dévoilant.
+- **Chute** (`"drop"`) : la ligne tombe du haut de quelques pixels en
+apparaissant.
 - **Dérouler** (`"grow"`) : la ligne s'ouvre en hauteur et la bulle grandit pour
 lui faire place, comme un volet.
 - **Aucune** (`"none"`) : la ligne apparaît d'un coup, sans animation.
@@ -470,7 +476,8 @@ l'intérieur plutôt que d'allonger la fenêtre.
   Minimal), case **Afficher la souris à côté du clavier**, case **Afficher les
   clics et la molette près du curseur** (suivi de la souris), son
   **design des clics près du curseur** (Classique, Contour ou Touche),
-  **Animation des lignes** (fondu, zoom, dérouler ou aucune), case
+  **Animation des lignes** (fondu, zoom, rebond, glisser, chute, dérouler ou
+  aucune), case
   **Regrouper les appuis répétés de la même touche** (voir plus haut) et
   **Transition de la bulle** (fondu, glissements dans les quatre directions, zoom ou aucune)
   avec sa durée en millisecondes. L'aperçu bascule immédiatement sur le
@@ -714,7 +721,7 @@ deux formes cohabitent.
 | `concat_text` | `false` (défaut) : une pastille par touche. `true` : les caractères s'ajoutent dans une ligne de texte. |
 | `typing_join_delay` | Pause (s) qui clôt la ligne de texte en mode `concat_text`. |
 | `count_repeats` | `true` (défaut) : deux appuis de suite sur la même touche affichent `×2` sur une seule pastille. `false` : une pastille par appui. |
-| `row_animation` | Apparition des lignes de l'overlay standard : `fade` (défaut), `zoom`, `grow` (dérouler) ou `none`. |
+| `row_animation` | Apparition des lignes de l'overlay standard : `fade` (défaut), `zoom`, `bounce` (rebond), `slide` (glisser), `drop` (chute), `grow` (dérouler) ou `none`. |
 | `capture_keyboard` | Afficher les frappes (les raccourcis restent actifs même si `false`). |
 | `capture_mouse` | Afficher les clics et la molette. |
 | `ignore_key_repeats` | Ne pas répéter une touche maintenue enfoncée. |

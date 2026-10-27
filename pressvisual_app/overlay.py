@@ -72,10 +72,20 @@ KEYBOARD_MAX_LIT = 16
 ROW_ANIMATION_MS = 180
 #: Cadence de rafraîchissement des apparitions (ms), soit ~60 images/s.
 ROW_ANIMATION_TICK_MS = 16
+#: Course des animations « glisser » et « chute », en pixels.
+ROW_SHIFT_PX = 14.0
 #: Hauteur maximale d'un widget Qt (valeur « sans limite »).
 ROW_MAX_HEIGHT = 16777215
 #: Côté de la zone de la poignée qui redimensionne le clavier (px).
 RESIZE_GRIP_SIZE = 22
+
+
+def _ease_out_back(progress: float) -> float:
+    """Sortie qui dépasse sa cible avant de se poser (rebond)."""
+    c1 = 1.70158
+    c3 = c1 + 1.0
+    return 1.0 + c3 * (progress - 1.0) ** 3 + c1 * (progress - 1.0) ** 2
+
 
 class Overlay(QWidget):
     """Fenêtre flottante affichant les frappes et les clics."""
@@ -1002,9 +1012,13 @@ class Overlay(QWidget):
             # place, comme un volet qui se déroule.
             height = max(1, row.sizeHint().height())
             row.setMaximumHeight(0)
-        elif style == "zoom":
+        elif style in ("zoom", "bounce"):
             # Les pastilles grossissent depuis leur centre, à place constante.
             row.set_zoom(0.7)
+        elif style == "slide":
+            row.set_offset(-ROW_SHIFT_PX, 0.0)
+        elif style == "drop":
+            row.set_offset(0.0, -ROW_SHIFT_PX)
 
         self._row_appearances.append((row, time.monotonic(), style, height))
         if not self._row_animation_timer.isActive():
@@ -1024,15 +1038,30 @@ class Overlay(QWidget):
             progress = min(1.0, (now - start) * 1000.0 / duration)
             # Sortie douce : rapide au début, posée à l'arrivée.
             eased = 1.0 - (1.0 - progress) ** 3
-            row.set_appear(eased)
+            if style == "bounce":
+                # L'opacité monte vite pour que le rebond se voie.
+                row.set_appear(min(1.0, progress * 2.5))
+                row.set_zoom(0.7 + 0.3 * _ease_out_back(progress))
+            else:
+                row.set_appear(eased)
             if style == "grow":
                 row.setMaximumHeight(max(1, int(round(height * eased))))
                 grew = True
             elif style == "zoom":
                 row.set_zoom(0.7 + 0.3 * eased)
+            elif style == "slide":
+                row.set_offset(-ROW_SHIFT_PX * (1.0 - eased), 0.0)
+            elif style == "drop":
+                row.set_offset(0.0, -ROW_SHIFT_PX * (1.0 - eased))
+
             if progress < 1.0:
                 remaining.append((row, start, style, height))
-            elif style == "grow":
+                continue
+            # Arrivée : la ligne reprend exactement sa place et sa taille.
+            row.set_appear(1.0)
+            row.set_zoom(1.0)
+            row.set_offset(0.0, 0.0)
+            if style == "grow":
                 row.setMaximumHeight(ROW_MAX_HEIGHT)
 
         self._row_appearances = remaining

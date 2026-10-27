@@ -95,11 +95,22 @@ TRANSITION_LABELS: dict[str, str] = {
 }
 
 #: Animations d'apparition des lignes de l'overlay standard.
-ROW_ANIMATIONS: tuple[str, ...] = ("fade", "zoom", "grow", "none")
+ROW_ANIMATIONS: tuple[str, ...] = (
+    "fade",
+    "zoom",
+    "bounce",
+    "slide",
+    "drop",
+    "grow",
+    "none",
+)
 
 ROW_ANIMATION_LABELS: dict[str, str] = {
     "fade": "Fondu",
     "zoom": "Zoom",
+    "bounce": "Rebond",
+    "slide": "Glisser",
+    "drop": "Chute",
     "grow": "Dérouler",
     "none": "Aucune",
 }

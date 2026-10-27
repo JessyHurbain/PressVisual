@@ -220,7 +220,15 @@ def test_display_settings_are_translated(english, qapp, config):
             dialog.animation_combo.itemText(index)
             for index in range(dialog.animation_combo.count())
         ]
-        assert animations == ["Fade", "Zoom", "Unfold", "None"]
+        assert animations == [
+            "Fade",
+            "Zoom",
+            "Bounce",
+            "Slide",
+            "Drop",
+            "Unfold",
+            "None",
+        ]
     finally:
         dialog.deleteLater()
 

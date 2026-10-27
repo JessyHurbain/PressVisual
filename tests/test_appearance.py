@@ -446,7 +446,15 @@ def test_dialog_exposes_row_animations(qapp, config):
             for index in range(dialog.animation_combo.count())
         ]
 
-        assert choices == ["fade", "zoom", "grow", "none"]
+        assert choices == [
+            "fade",
+            "zoom",
+            "bounce",
+            "slide",
+            "drop",
+            "grow",
+            "none",
+        ]
         assert dialog.animation_combo.currentData() == "fade"
         assert dialog.values()["row_animation"] == "fade"
 
