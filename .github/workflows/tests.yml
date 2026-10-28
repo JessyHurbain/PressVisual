@@ -76,9 +76,26 @@ jobs:
         if: runner.os == 'Linux'
         run: xvfb-run -a python -m pytest -q
 
-      - name: Lancer les tests (Windows et macOS)
-        if: runner.os != 'Linux'
+      - name: Lancer les tests (Windows)
+        if: runner.os == 'Windows'
         run: python -m pytest -q
+
+      # Un échec propre à macOS ne se reproduit sur aucune autre machine, et le
+      # journal complet d'une tâche n'est lisible qu'avec un compte GitHub. Une
+      # annotation, elle, est publique : les premières lignes d'échec y sont
+      # recopiées pour que la panne soit diagnostiquable sans le journal.
+      - name: Lancer les tests (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          set -o pipefail
+          status=0
+          python -m pytest -q 2>&1 | tee pytest.log || status=$?
+          if (( status != 0 )); then
+            grep -E "^(FAILED|ERROR)" pytest.log | head -n 8 | while IFS= read -r line; do
+              echo "::error::${line}"
+            done || true
+            exit "$status"
+          fi
 
   # Une seule tâche suffit : le style et la couverture ne dépendent ni du
   # système ni de la version de Python, contrairement aux tests eux-mêmes.
