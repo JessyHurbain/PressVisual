@@ -8,6 +8,7 @@ import pytest
 from pynput import keyboard
 
 import pressvisual
+from pressvisual_app import capture as capture_module
 
 
 @pytest.mark.parametrize(
@@ -76,6 +77,28 @@ def test_is_altgr():
     assert pressvisual._is_altgr(keyboard.Key.alt_gr) is True
     assert pressvisual._is_altgr(keyboard.Key.ctrl) is False
     assert pressvisual._is_altgr(keyboard.KeyCode.from_char("a")) is False
+
+
+def test_altgr_est_reconnu_sous_le_nom_alt_r_sur_macos(monkeypatch):
+    """macOS n'a pas d'AltGr : c'est l'Option droite, que pynput nomme alt_r.
+
+    Le nom est simulé pour que la règle soit éprouvée sur toutes les
+    plateformes, et pas seulement sur un runner macOS.
+    """
+    monkeypatch.setattr(
+        capture_module, "ALTGR_KEY_NAMES", frozenset({"alt_gr", "alt_r"})
+    )
+
+    assert pressvisual._is_altgr(keyboard.Key.alt_r) is True
+    assert pressvisual._classify_key(keyboard.Key.alt_r) == (None, None, False)
+
+
+def test_alt_r_reste_un_modificateur_hors_macos(monkeypatch):
+    """Ailleurs, l'Alt de droite est un vrai modificateur, pas un AltGr."""
+    monkeypatch.setattr(capture_module, "ALTGR_KEY_NAMES", frozenset({"alt_gr"}))
+
+    assert pressvisual._is_altgr(keyboard.Key.alt_r) is False
+    assert pressvisual._classify_key(keyboard.Key.alt_r) == ("alt", None, True)
 
 
 @pytest.mark.parametrize(

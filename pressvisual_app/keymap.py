@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING, Optional
 
 from .i18n import _t
@@ -170,6 +171,18 @@ MODIFIER_KEYS: dict[str, str] = {
     "cmd_l": "win",
     "cmd_r": "win",
 }
+
+#: Noms par lesquels ``pynput`` désigne la touche AltGr sur cette plateforme.
+#:
+#: macOS n'a pas d'AltGr : c'est la touche Option droite qui compose les
+#: caractères, et ``pynput`` lui donne deux noms pour un seul code (0x3D).
+#: ``Key.alt_gr`` y est donc un alias de ``Key.alt_r``, et son nom vaut
+#: ``alt_r``. Se fier au seul nom ``alt_gr`` laissait Option sans effet sur
+#: macOS : elle n'allumait qu'un modificateur, et le texte composé (``é``,
+#: ``@``, ``{``) n'apparaissait jamais.
+ALTGR_KEY_NAMES: frozenset[str] = frozenset(
+    {"alt_gr", "alt_r"} if sys.platform == "darwin" else {"alt_gr"}
+)
 
 #: Préfixe pynput de chaque modificateur, pour nommer le côté enfoncé.
 MODIFIER_SIDE_PREFIXES: dict[str, str] = {

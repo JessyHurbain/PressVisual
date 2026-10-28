@@ -174,6 +174,26 @@ def test_altgr_produces_text_without_modifiers(recorder, config):
     ]
 
 
+def test_option_droite_produit_du_texte_sur_macos(recorder, config, monkeypatch):
+    """Sur macOS, AltGr est l'Option droite, nommée « alt_r » par pynput.
+
+    Sans cette règle, Option n'allumait qu'un modificateur et les caractères
+    composés (é, @, {) n'apparaissaient jamais dans la bulle.
+    """
+    monkeypatch.setattr(
+        capture_module, "ALTGR_KEY_NAMES", frozenset({"alt_gr", "alt_r"})
+    )
+    listener = make_listener(recorder, config)
+
+    listener._on_press(keyboard.Key.ctrl)
+    listener._on_press(keyboard.Key.alt_r)
+    listener._on_press(keyboard.KeyCode.from_char("é"))
+
+    assert recorder.keys == [
+        pressvisual.KeyEvent(token="é", char="é", mods=())
+    ]
+
+
 def test_errors_are_reported_only_once(recorder, config):
     listener = make_listener(recorder, config)
 

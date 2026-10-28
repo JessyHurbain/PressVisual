@@ -23,7 +23,12 @@ except Exception as exc:  # pragma: no cover - dépend de l'environnement
 
 from .events import InputBridge, KeyEvent, MouseEvent
 from .i18n import _t
-from .keymap import MODIFIER_KEYS, MODIFIER_ORDER, modifier_side_token
+from .keymap import (
+    ALTGR_KEY_NAMES,
+    MODIFIER_KEYS,
+    MODIFIER_ORDER,
+    modifier_side_token,
+)
 
 if TYPE_CHECKING:
     from .config import Config
@@ -349,8 +354,13 @@ class InputListener(threading.Thread):
 
 
 def _is_altgr(key) -> bool:
-    """Vrai si la touche est AltGr (Windows/macOS)."""
-    return isinstance(key, keyboard.Key) and key.name == "alt_gr"
+    """Vrai si la touche est AltGr (Windows/macOS).
+
+    Les noms acceptés dépendent de la plateforme : sur macOS, AltGr est
+    l'Option droite, que ``pynput`` nomme ``alt_r`` (``Key.alt_gr`` y est le
+    même objet, sous un nom d'alias).
+    """
+    return isinstance(key, keyboard.Key) and key.name in ALTGR_KEY_NAMES
 
 
 def _modifier_side(key, token: str) -> str:
@@ -372,13 +382,15 @@ def _classify_key(key) -> tuple[Optional[str], Optional[str], bool]:
     """
     if isinstance(key, keyboard.Key):
         name = key.name
+        # AltGr produit des caractères accentués : ne pas l'afficher comme un
+        # modificateur afin de laisser le texte se concaténer. Ce test passe
+        # avant MODIFIER_KEYS : sur macOS, AltGr s'appelle « alt_r », un nom
+        # qui désigne par ailleurs un modificateur.
+        if name in ALTGR_KEY_NAMES:
+            return None, None, False
         modifier = MODIFIER_KEYS.get(name)
         if modifier is not None:
             return modifier, None, True
-        if name == "alt_gr":
-            # AltGr produit des caractères accentués : ne pas l'afficher comme
-            # un modificateur afin de laisser le texte se concaténer.
-            return None, None, False
         return name, None, False
 
     vk = getattr(key, "vk", None)

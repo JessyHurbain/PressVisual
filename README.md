@@ -1014,6 +1014,11 @@ ou *Ouvrir* par le menu contextuel. Pour une distribution publique, signez avec
 un certificat Developer ID et notarisez (`notarytool`) ; `CODESIGN_ID` sert
 précisément à cela.
 
+**Touche Option.** macOS n'a pas d'AltGr : c'est la touche Option droite qui
+compose les caractères accentués et les symboles (`é`, `@`, `{`). Elle est donc
+traitée comme un AltGr — le texte composé s'affiche au lieu d'un modificateur —,
+alors que l'Option gauche reste un modificateur, comme Ctrl ou Maj.
+
 **Configuration.** Contrairement à Windows et Linux, un bundle `.app` n'écrit pas
 à côté de son exécutable : les réglages vont dans
 `~/Library/Application Support/PressVisual/config.json`, y compris lorsque
