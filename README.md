@@ -211,10 +211,10 @@ bash tools/check_ci.sh
 
 Le script rejoue la compilation, `ruff` et les tests avec le seuil de couverture
 sous une locale neutre et, sous Linux, avec `xvfb-run` : ce sont les conditions
-des runners, celles où un échec invisible sur votre poste se révèle. Windows et
-les autres versions de Python de la matrice ne sont pas reproduits ; le script
-annonce ce qu'il a utilisé. `SKIP_COVERAGE=1` saute la mesure de couverture et
-`PYTHON=/chemin/vers/python` impose un interpréteur.
+des runners, celles où un échec invisible sur votre poste se révèle. Windows,
+macOS et les autres versions de Python de la matrice ne sont pas reproduits ;
+le script annonce ce qu'il a utilisé. `SKIP_COVERAGE=1` saute la mesure de
+couverture et `PYTHON=/chemin/vers/python` impose un interpréteur.
 
 Pour ne plus y penser, le dépôt fournit un crochet `pre-push` versionné : il
 extrait la révision réellement poussée dans une copie de travail jetable et y
@@ -251,9 +251,13 @@ traductions (tous les catalogues complets et à jour, rendu dans chaque langue).
 Sous Linux sans session graphique, l'import de `pynput` a besoin d'un serveur
 X11 : lancez alors `xvfb-run -a python -m pytest`. C'est ce que fait le workflow
 [`.github/workflows/tests.yml`](.github/workflows/tests.yml), exécuté à chaque
-poussée sur `main` et à chaque pull request. Sa matrice couvre **Linux et
-Windows** avec **Python 3.9 à 3.12**, sous le greffon Qt « offscreen » : aucune
-fenêtre ne s'ouvre, et rien n'est envoyé au vrai clavier ni à la vraie souris.
+poussée sur `main` et à chaque pull request. Sa matrice couvre **Linux,
+Windows et macOS** avec **Python 3.9 à 3.12** sur les deux premiers et **3.12**
+sur macOS — la version qui empaquette le `.dmg` —, sous le greffon Qt
+« offscreen » : aucune fenêtre ne s'ouvre, et rien n'est envoyé au vrai clavier
+ni à la vraie souris. macOS n'est donc pas seulement construit puis livré : son
+comportement propre (import de `pynput` par Quartz, dialogues Qt, chemin du
+dossier de données) est éprouvé à chaque poussée.
 
 Une tâche séparée, **Analyse statique et couverture**, s'exécute une seule fois
 (Ubuntu, Python 3.12) et joue deux garde-fous :
@@ -1067,12 +1071,33 @@ tâche interroge le workflow Tests** sur le commit exact porté par le tag : san
 exécution verte, la release s'arrête là et rien n'est construit. Un tag posé sur
 un commit jamais poussé sur `main` — donc jamais éprouvé par la matrice complète —
 ou dont les tests ont échoué est ainsi refusé ; une exécution encore en cours
-dispose de jusqu'à 30 minutes pour aboutir. Les **trois binaires** sont ensuite
-construits avec le numéro du tag — l'AppImage sur Ubuntu, le `.exe` sur Windows
-et le `.dmg` sur macOS —, chacun conservé comme artefact du workflow ; la tâche
-AppImage rejoue la suite sur l'arbre empaqueté, par contrôle supplémentaire. Une
-cinquième tâche attend les trois et les attache à la release GitHub du tag, créée
-si elle n'existe pas encore. Un lancement manuel du workflow produit seulement
+dispose de jusqu'à 30 minutes pour aboutir.
+
+**La deuxième tâche vérifie la version du tag.** Le nom des fichiers vient du
+tag (`v1.2.3` → `PressVisual-1.2.3-…`), le numéro affiché par l'application vient
+de `APP_VERSION` dans [`pressvisual_app/constants.py`](pressvisual_app/constants.py).
+Si les deux diffèrent, la tâche échoue et **aucun binaire n'est construit** :
+c'est ce qui empêche de livrer une version dont le fichier et `--version` ne
+disent pas la même chose. Pour publier, mettez donc `APP_VERSION` à jour **dans
+le commit que vous taguez** :
+
+```bash
+# pressvisual_app/constants.py
+APP_VERSION = "1.2.3"
+```
+
+Le contrôle est rejouable à la main, sans tag ni GitHub :
+
+```bash
+python tools/check_version.py v1.2.3
+```
+
+Les **trois binaires** sont ensuite construits avec le numéro du tag
+— l'AppImage sur Ubuntu, le `.exe` sur Windows et le `.dmg` sur macOS —, chacun
+conservé comme artefact du workflow ; la tâche AppImage rejoue la suite sur
+l'arbre empaqueté, par contrôle supplémentaire. Une dernière tâche attend les
+trois et les attache à la release GitHub du tag, créée si elle n'existe pas
+encore. Un lancement manuel du workflow produit seulement
 les artefacts, sans toucher aux releases.
 
 Les notes de release sont **le message du tag annoté** :

@@ -11,8 +11,8 @@
 # tests, qui n'ouvrent pas de fenêtre mais dont l'import de pynput a besoin d'un
 # affichage.
 #
-# Ce que ce script ne reproduit pas : Windows ni les autres versions de Python
-# de la matrice (3.9 à 3.12). Il annonce l'interpréteur qu'il a utilisé.
+# Ce que ce script ne reproduit pas : Windows, macOS ni les autres versions de
+# Python de la matrice (3.9 à 3.12). Il annonce l'interpréteur qu'il a utilisé.
 #
 # Variables d'environnement facultatives :
 #   PYTHON=/chemin/vers/python   interpréteur à utiliser (défaut : .venv, sinon python3)
@@ -114,4 +114,4 @@ if [[ -n ${SKIP_COVERAGE:-} ]]; then
     note "couverture non mesurée (SKIP_COVERAGE)."
 fi
 note "tout est vert : $(tail -n 1 "$LOG")"
-note "non reproduit : Windows et les autres versions de Python de la matrice."
+note "non reproduit : Windows, macOS et les autres versions de Python de la matrice."

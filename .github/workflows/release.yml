@@ -88,9 +88,37 @@ jobs:
             sleep 30
           done
 
+  # Le nom des binaires vient du tag, le numéro affiché par l'application vient
+  # de APP_VERSION (pressvisual_app/constants.py) : sans cette porte, un oubli
+  # de mise à jour livrait un fichier « 1.2.3 » qui répond « 1.2.2 ». La tâche
+  # n'est jamais sautée — un lancement manuel n'a pas de tag —, c'est l'étape
+  # qui l'est : une tâche sautée ferait sauter les trois constructions qui en
+  # dépendent.
+  version-du-tag:
+    name: Vérifier la version du tag
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v7
+
+      - name: Comparer le tag à la version affichée
+        if: github.ref_type == 'tag'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # stdlib seulement : aucune dépendance à installer avant de savoir
+          # si la release a un sens.
+          if ! message=$(python3 tools/check_version.py "${TAG}" 2>&1); then
+            echo "::error::${message}"
+            exit 1
+          fi
+          echo "::notice::${message}"
+
   appimage:
     name: AppImage (Linux)
-    needs: tests-verts
+    needs: [tests-verts, version-du-tag]
     runs-on: ubuntu-24.04
     env:
       PYTHONUTF8: "1"
@@ -164,7 +192,7 @@ jobs:
 
   windows:
     name: Exécutable (Windows)
-    needs: tests-verts
+    needs: [tests-verts, version-du-tag]
     runs-on: windows-latest
 
     steps:
@@ -214,7 +242,7 @@ jobs:
 
   macos:
     name: Bundle (macOS)
-    needs: tests-verts
+    needs: [tests-verts, version-du-tag]
     # Runner Apple Silicon : le build PyInstaller cible l'architecture de la
     # machine qui l'exécute, et le nom du fichier le mentionne. Pour un .dmg
     # Intel, ajoutez « macos-26-intel » à une matrice.

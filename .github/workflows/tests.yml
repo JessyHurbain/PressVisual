@@ -23,9 +23,9 @@ jobs:
       PYTHONIOENCODING: utf-8
     strategy:
       fail-fast: false
-      # Windows est la plateforme principale de PressVisual et Python 3.9 est la
-      # version minimale annoncée : les deux doivent être vérifiés, pas seulement
-      # la combinaison la plus récente sous Linux.
+      # Windows est la plateforme principale de PressVisual, macOS livre un
+      # .dmg et Python 3.9 est la version minimale annoncée : les trois doivent
+      # être vérifiés, pas seulement la combinaison la plus récente sous Linux.
       matrix:
         # Ubuntu 24.04 est épinglé volontairement : « ubuntu-latest » bascule
         # progressivement sur Ubuntu 26.04, pour lequel actions/setup-python ne
@@ -33,6 +33,13 @@ jobs:
         # même commit échoue sur un runner et passe sur l'autre.
         os: [ubuntu-24.04, windows-latest]
         python-version: ["3.9", "3.10", "3.11", "3.12"]
+        # macOS n'apparaît qu'avec la version qui empaquette le .dmg : cette
+        # tâche vérifie le comportement propre à la plateforme (import de
+        # pynput par Quartz, dialogues Qt, chemins du dossier de données), pas
+        # la compatibilité des versions de Python, déjà couverte deux fois.
+        include:
+          - os: macos-latest
+            python-version: "3.12"
 
     steps:
       - name: Récupérer le dépôt
@@ -64,13 +71,13 @@ jobs:
 
       # Les tests utilisent le greffon Qt « offscreen » : aucune fenêtre ne
       # s'ouvre. Xvfb fournit seulement l'affichage X11 dont pynput a besoin
-      # pour s'importer sous Linux ; Windows n'en a pas besoin.
+      # pour s'importer sous Linux ; ni Windows ni macOS n'en ont besoin.
       - name: Lancer les tests (Linux)
         if: runner.os == 'Linux'
         run: xvfb-run -a python -m pytest -q
 
-      - name: Lancer les tests (Windows)
-        if: runner.os == 'Windows'
+      - name: Lancer les tests (Windows et macOS)
+        if: runner.os != 'Linux'
         run: python -m pytest -q
 
   # Une seule tâche suffit : le style et la couverture ne dépendent ni du
